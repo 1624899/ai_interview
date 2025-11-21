@@ -175,8 +175,8 @@ def build_mock_interview_graph():
     """
     workflow = StateGraph(InterviewState)
     
-    # 获取记忆保存器
-    checkpointer = get_memory_saver()
+    # 获取记忆保存器（使用持久化存储）
+    checkpointer = get_memory_saver(use_persistence=True)
 
     # 添加节点
     workflow.add_node("router", node_router)
@@ -208,8 +208,8 @@ def build_coach_interview_graph():
     """
     workflow = StateGraph(InterviewState)
     
-    # 获取记忆保存器
-    checkpointer = get_memory_saver()
+    # 获取记忆保存器（使用持久化存储）
+    checkpointer = get_memory_saver(use_persistence=True)
 
     # 添加节点
     workflow.add_node("router", node_router)

@@ -1,0 +1,15 @@
+# 心流 API 配置（用于 LLM）
+XINLIU_API_KEY=xxxx
+XINLIU_API_BASE=https://apis.iflow.cn/v1
+XINLIU_API_MODEL=qwen3-coder-plus
+
+# 嵌入模型配置（SiliconFlow）
+EMBEDDING_API_KEY=xxxx
+EMBEDDING_API_BASE=https://api.siliconflow.cn/v1
+EMBEDDING_API_MODEL=BAAI/bge-m3
+
+# 文件服务配置
+UPLOAD_DIR=data/resumes
+MAX_FILE_SIZE_MB=10
+ALLOWED_FILE_EXTENSIONS=pdf,docx,txt
+MAX_RESUME_COUNT=5

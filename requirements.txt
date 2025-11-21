@@ -2,6 +2,7 @@ langchain
 langchain-openai
 langchain-community
 langgraph           # 必须：用于构建有状态的面试流程
+langgraph-checkpoint-sqlite  # 用于存储面试流程状态
 pypdf               # 用于解析简历
 python-docx         # 用于解析 Word 文档
 faiss-cpu           # 向量数据库 (CPU 版本)

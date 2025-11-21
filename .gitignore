@@ -1,0 +1,7 @@
+.vscode
+.chainlit
+__pycache__
+data
+.env
+meta-output
+test

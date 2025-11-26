@@ -107,7 +107,7 @@ async def start():
     thread_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": thread_id}}
     cl.user_session.set("thread_id", thread_id)  # 保存thread_id供后续使用
-    async for event in graph.astream_events(inputs, config=config, version="v1"):
+    async for event in graph.astream_events(inputs, config=config):
         kind = event["event"]
         
         # 监听 LLM 的流式输出
@@ -203,7 +203,7 @@ async def main(message: cl.Message):
         thread_id = str(uuid.uuid4())
         cl.user_session.set("thread_id", thread_id)
     config = {"configurable": {"thread_id": thread_id}}
-    async for event in graph.astream_events(inputs, config=config, version="v1"):
+    async for event in graph.astream_events(inputs, config=config):
         kind = event["event"]
         
         # 监听 LLM 的流式输出

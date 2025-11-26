@@ -82,7 +82,7 @@ def get_coach_interviewer_prompt(resume: str, jd: str, current_count: int) -> st
     1. 如果这是第一个问题（没有历史对话）：
        - 做简短的自我介绍（1-2句话）
        - 说明这是辅导模式，会提供详细讲解
-       - 直接提出第一个技术问题
+       - 直接根据简历摘要与目标职位提出第一个技术问题
     
     2. 如果是后续问题（有历史对话）：
        

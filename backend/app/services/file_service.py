@@ -2,20 +2,26 @@ import os
 import uuid
 import json
 import logging
+import shutil
 from typing import List
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
+from fastapi import UploadFile
 
 # 加载环境变量
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+current_file_path = os.path.abspath(__file__)
+backend_dir = os.path.dirname(os.path.dirname(current_file_path))
+project_root = os.path.dirname(backend_dir)
 env_path = os.path.join(project_root, ".env")
-load_dotenv(env_path)
 
-# 从环境变量读取配置，使用项目根目录作为基准
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.join(project_root, "data", "resumes"))
+if not load_dotenv(env_path):
+    print(f"警告: 文件服务无法从 {env_path} 加载环境变量")
+
+# 从环境变量读取配置，使用 backend/data 作为基准
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.join(backend_dir, "data", "resumes"))
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
 ALLOWED_EXTENSIONS = os.getenv("ALLOWED_FILE_EXTENSIONS", "pdf,docx,txt").split(',')
 MAX_RESUME_COUNT = int(os.getenv("MAX_RESUME_COUNT", "5"))
@@ -42,7 +48,7 @@ class FileSizeExceededError(FileServiceError):
 
 class FileService:
     """
-    文件服务类，专为 Chainlit 设计
+    文件服务类，支持 Chainlit 和 FastAPI
     
     支持的文件格式：
     - PDF (.pdf)
@@ -266,6 +272,88 @@ class FileService:
             raise
         except Exception as e:
             logger.error(f"处理 Chainlit 文件失败: {str(e)}")
+            raise FileServiceError(f"文件处理失败: {str(e)}")
+
+    async def process_fastapi_file(self, upload_file: UploadFile) -> str:
+        """
+        处理 FastAPI 上传的文件并保存元数据
+        
+        Args:
+            upload_file: FastAPI 的 UploadFile 对象
+            
+        Returns:
+            str: 提取的文本内容
+        """
+        try:
+            # 1. 验证文件类型
+            if not self._validate_file_type(upload_file.filename):
+                raise UnsupportedFileTypeError(
+                    f"不支持的文件类型: {upload_file.filename}。"
+                    f"支持的格式: {', '.join(self.allowed_extensions)}"
+                )
+            
+            # 2. 验证文件大小 (注意：UploadFile.size 可能为 None)
+            file_size = 0
+            if hasattr(upload_file, 'size') and upload_file.size is not None:
+                file_size = upload_file.size
+            else:
+                # 如果 size 为 None，需要读取文件来获取大小
+                upload_file.file.seek(0, 2)  # 移动到文件末尾
+                file_size = upload_file.file.tell()
+                upload_file.file.seek(0)  # 重置到文件开头
+            
+            if not self._validate_file_size(file_size):
+                raise FileSizeExceededError(
+                    f"文件大小 ({file_size / 1024 / 1024:.2f}MB) "
+                    f"超过限制 ({MAX_FILE_SIZE_MB}MB)"
+                )
+            
+            # 3. 生成唯一文件名并保存
+            unique_filename = self._generate_unique_filename(upload_file.filename)
+            target_path = os.path.join(self.upload_dir, unique_filename)
+            
+            # 保存文件
+            try:
+                with open(target_path, "wb") as buffer:
+                    shutil.copyfileobj(upload_file.file, buffer)
+            finally:
+                upload_file.file.close()
+            
+            logger.info(f"FastAPI 文件已保存: {target_path}")
+            
+            # 4. 提取文本
+            text_content = self.extract_text(target_path)
+            
+            # 5. 验证内容有效性
+            if not text_content or not text_content.strip():
+                raise FileServiceError("文件解析成功但内容为空")
+            
+            # 6. 保存元数据
+            metadata = self._load_metadata()
+            
+            metadata[unique_filename] = {
+                "original_name": upload_file.filename,  # 原始文件名
+                "stored_name": unique_filename,  # 实际存储的文件名
+                "upload_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "file_size": file_size,
+                "content_length": len(text_content),
+                "use_count": 0,
+                "last_used": None
+            }
+            
+            self._save_metadata(metadata)
+            
+            # 清理旧简历，保持数量不超过限制
+            self._cleanup_old_resumes()
+            
+            logger.info(f"文本提取成功，长度: {len(text_content)} 字符")
+            logger.info(f"元数据已保存: {unique_filename}")
+            return text_content
+            
+        except (UnsupportedFileTypeError, FileSizeExceededError, FileServiceError):
+            raise
+        except Exception as e:
+            logger.error(f"处理 FastAPI 文件失败: {str(e)}")
             raise FileServiceError(f"文件处理失败: {str(e)}")
 
     def get_resume_list(self) -> list:

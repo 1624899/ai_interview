@@ -5,9 +5,9 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, Base
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
-import app.core.llms as llms
-from app.core import prompt as prompt_module
-from app.core.memory import get_memory_saver
+from . import llms
+from . import prompt as prompt_module
+from .memory import get_memory_saver
 
 # 定义状态
 class InterviewState(TypedDict):
@@ -175,8 +175,8 @@ def build_mock_interview_graph():
     """
     workflow = StateGraph(InterviewState)
     
-    # 获取记忆保存器（使用持久化存储）
-    checkpointer = get_memory_saver(use_persistence=True)
+    # 获取记忆保存器（暂时使用内存存储）
+    checkpointer = get_memory_saver(use_persistence=False, async_mode=False)
 
     # 添加节点
     workflow.add_node("router", node_router)
@@ -208,8 +208,8 @@ def build_coach_interview_graph():
     """
     workflow = StateGraph(InterviewState)
     
-    # 获取记忆保存器（使用持久化存储）
-    checkpointer = get_memory_saver(use_persistence=True)
+    # 获取记忆保存器（暂时使用内存存储）
+    checkpointer = get_memory_saver(use_persistence=False, async_mode=False)
 
     # 添加节点
     workflow.add_node("router", node_router)

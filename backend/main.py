@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import chat, upload
+from app.api import chat, upload, sessions
 from app.models.schemas import ErrorResponse
 
 # 配置日志
@@ -28,6 +28,10 @@ async def lifespan(app: FastAPI):
     """
     # 启动时执行
     logger.info("AI 面试助手后端服务启动中...")
+    
+    # 初始化数据库
+    from app.database import init_database
+    init_database()
     
     # 确保数据目录存在
     data_dir = os.path.join(os.path.dirname(__file__), "data")
@@ -81,7 +85,7 @@ async def general_exception_handler(request, exc):
         status_code=500,
         content={
             "error": "InternalServerError",
-            "message": "服务器内部错误，请稍后重试"
+            "message": "服务器内部错误,请稍后重试"
         }
     )
 
@@ -116,11 +120,14 @@ async def health_check():
 # 注册路由
 app.include_router(chat.router)
 app.include_router(upload.router)
+app.include_router(sessions.router)
 
 
 # 启动信息
 if __name__ == "__main__":
     import uvicorn
+    import signal
+    import sys
     
     # 从环境变量读取配置，如果没有则使用默认值
     host = os.getenv("HOST", "0.0.0.0")
@@ -130,10 +137,34 @@ if __name__ == "__main__":
     logger.info(f"启动服务器: http://{host}:{port}")
     logger.info(f"API 文档: http://{host}:{port}/docs")
     
-    uvicorn.run(
+    # 配置 uvicorn
+    config = uvicorn.Config(
         "main:app",
         host=host,
         port=port,
         reload=debug,
         log_level="info"
     )
+    
+    # 创建服务器实例
+    server = uvicorn.Server(config)
+    
+    # 定义信号处理函数
+    def handle_signal(signum, frame):
+        logger.info(f"接收到信号 {signum}，正在关闭服务器...")
+        server.should_exit = True
+    
+    # 注册信号处理器
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+    
+    # 启动服务器
+    try:
+        server.run()
+    except KeyboardInterrupt:
+        logger.info("用户中断，正在关闭服务器...")
+    except Exception as e:
+        logger.error(f"服务器运行出错: {e}")
+    finally:
+        logger.info("服务器已关闭")
+        sys.exit(0)

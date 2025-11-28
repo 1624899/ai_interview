@@ -63,3 +63,9 @@ class ErrorResponse(BaseModel):
     error: str = Field(..., description="错误类型")
     message: str = Field(..., description="错误消息")
     details: Optional[dict] = Field(None, description="错误详情")
+
+
+class RollbackRequest(BaseModel):
+    """回退请求模型"""
+    thread_id: str = Field(..., description="会话线程ID")
+    index: int = Field(..., description="回退到的消息索引（0-based）")

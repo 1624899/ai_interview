@@ -12,12 +12,16 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 
 from app.core.graph import build_interview_graph
-from app.models.schemas import ChatRequest, ChatStreamResponse, InterviewStartRequest, ErrorResponse
+from app.models.schemas import ChatRequest, ChatStreamResponse, InterviewStartRequest, ErrorResponse, RollbackRequest
+from app.services.session_service import SessionService
 
 # 配置日志
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["聊天"])
+
+# 实例化会话服务
+session_service = SessionService()
 
 
 @router.post("/start")
@@ -32,8 +36,8 @@ async def start_interview(request: InterviewStartRequest):
         dict: 会话开始结果
     """
     try:
-        # 初始化图谱
-        graph = build_interview_graph(request.mode)
+        # 初始化图谱（异步）
+        graph = await build_interview_graph(request.mode)
         
         # 配置线程 ID
         config = {"configurable": {"thread_id": request.thread_id}}
@@ -48,13 +52,33 @@ async def start_interview(request: InterviewStartRequest):
             "max_questions": request.max_questions
         }
         
+        # 检查会话是否已存在，如果不存在则创建
+        session = await session_service.get_session(request.thread_id)
+        if session is None:
+            await session_service.create_session(
+                session_id=request.thread_id,
+                mode=request.mode,
+                job_description=request.job_description,
+                max_questions=request.max_questions
+            )
+        
+        # 生成并更新会话标题
+        mode_str = "辅导模式" if request.mode == "coach" else "模拟面试"
+        # 截取前20个字符作为摘要，防止过长
+        summary = request.job_description[:20] + "..." if len(request.job_description) > 20 else request.job_description
+        title = f"{mode_str}-{summary}"
+        
+        # 更新数据库中的会话标题
+        await session_service.update_session(request.thread_id, title=title)
+
         # 返回会话信息
         return {
             "success": True,
             "message": "面试会话已初始化",
             "thread_id": request.thread_id,
             "mode": request.mode,
-            "max_questions": request.max_questions
+            "max_questions": request.max_questions,
+            "session_title": title
         }
         
     except Exception as e:
@@ -81,8 +105,8 @@ async def stream_chat(request: ChatRequest):
         StreamingResponse: SSE 流式响应
     """
     try:
-        # 初始化图谱
-        graph = build_interview_graph(request.mode)
+        # 初始化图谱（异步）
+        graph = await build_interview_graph(request.mode)
         
         # 配置线程 ID
         config = {"configurable": {"thread_id": request.thread_id}}
@@ -98,7 +122,7 @@ async def stream_chat(request: ChatRequest):
         }
         
         return StreamingResponse(
-            event_generator(graph, inputs, config),
+            event_generator(graph, inputs, config, request.thread_id, request.message),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -119,7 +143,7 @@ async def stream_chat(request: ChatRequest):
         )
 
 
-async def event_generator(graph, inputs, config) -> AsyncGenerator[str, None]:
+async def event_generator(graph, inputs, config, thread_id: str, user_message: str) -> AsyncGenerator[str, None]:
     """
     生成器：将 LangGraph 事件转换为 SSE 格式
     
@@ -127,11 +151,22 @@ async def event_generator(graph, inputs, config) -> AsyncGenerator[str, None]:
         graph: LangGraph 实例
         inputs: 输入状态
         config: 配置参数
+        thread_id: 会话线程ID
+        user_message: 用户消息内容
         
     Yields:
         str: SSE 格式的事件数据
     """
+    ai_response_content = ""
+    
     try:
+        # 保存用户消息到会话
+        await session_service.add_message(
+            session_id=thread_id,
+            role="user",
+            content=user_message
+        )
+        
         async for event in graph.astream_events(inputs, config=config, version="v1"):
             kind = event["event"]
             
@@ -139,6 +174,7 @@ async def event_generator(graph, inputs, config) -> AsyncGenerator[str, None]:
             if kind == "on_chat_model_stream":
                 content = event["data"]["chunk"].content
                 if content:
+                    ai_response_content += content
                     # SSE 格式: data: <json>\n\n
                     response = ChatStreamResponse(
                         type="token",
@@ -152,6 +188,14 @@ async def event_generator(graph, inputs, config) -> AsyncGenerator[str, None]:
                 if output and isinstance(output, dict):
                     # 可以在这里发送状态更新事件
                     if "question_count" in output:
+                        # 更新会话元数据
+                        await session_service.update_session(
+            session_id=thread_id,
+                            metadata_updates={
+                                "question_count": output["question_count"]
+                            }
+                        )
+                        
                         response = ChatStreamResponse(
                             type="state_update",
                             content=json.dumps({
@@ -160,6 +204,14 @@ async def event_generator(graph, inputs, config) -> AsyncGenerator[str, None]:
                             })
                         )
                         yield f"data: {response.model_dump_json()}\n\n"
+        
+        # 保存AI响应到会话
+        if ai_response_content:
+            await session_service.add_message(
+                session_id=thread_id,
+                role="ai",
+                content=ai_response_content
+            )
         
         # 发送结束信号
         response = ChatStreamResponse(
@@ -235,5 +287,41 @@ async def end_chat_session(thread_id: str):
             detail={
                 "error": "InternalServerError",
                 "message": "结束聊天会话失败"
+            }
+        )
+
+
+@router.post("/rollback")
+async def rollback_chat(request: RollbackRequest):
+    """
+    回退聊天会话
+    
+    Args:
+        request: 回退请求
+        
+    Returns:
+        dict: 回退结果
+    """
+    try:
+        success = await session_service.rollback_session(request.thread_id, request.index)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Session or message not found")
+            
+        return {
+            "success": True,
+            "message": f"会话已回退至索引 {request.index}",
+            "thread_id": request.thread_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"回退会话失败: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "InternalServerError",
+                "message": "回退会话失败"
             }
         )

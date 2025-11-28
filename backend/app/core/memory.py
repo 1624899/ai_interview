@@ -1,65 +1,19 @@
 """
 面试系统记忆模块
 负责管理面试过程中的状态持久化
+所有数据存储在统一的 ai_interview.db 数据库中
 """
 
-import os
+import aiosqlite
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-def get_memory_saver(use_persistence: bool = True, db_path: str = None, async_mode: bool = True):
-    """
-    获取检查点保存器
-    
-    Args:
-        use_persistence (bool): 是否使用持久化存储，默认为 True
-        db_path (str): 数据库文件路径，如果为 None 则使用默认路径
-        async_mode (bool): 是否使用异步模式，默认为 True
-    
-    Returns:
-        MemorySaver、SqliteSaver 或 AsyncSqliteSaver: 检查点保存器实例
-    """
-    # 为了避免异步问题，暂时使用 MemorySaver
-    # TODO: 后续可以配置使用 AsyncSqliteSaver
-    if use_persistence and not async_mode:
-        return get_sqlite_saver(db_path)
-    else:
-        return MemorySaver()
+from app.database import DB_PATH
 
-def get_sqlite_saver(db_path: str = None):
-    """
-    获取 SQLite 检查点保存器
-    
-    Args:
-        db_path (str): 数据库文件路径，如果为 None 则使用默认路径
-        
-    Returns:
-        SqliteSaver: SQLite 检查点保存器实例
-    """
-    if db_path is None:
-        # 在 backend/data 目录下存储数据库
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        backend_root = os.path.dirname(os.path.dirname(current_dir))
-        data_dir = os.path.join(backend_root, "data")
-        
-        # 确保 data 目录存在
-        os.makedirs(data_dir, exist_ok=True)
-        
-        # 数据库文件路径
-        db_path = os.path.join(data_dir, "interview_checkpoints.sqlite")
-    
-    # 在 LangGraph 1.0.2 中，直接使用 SqliteSaver 构造函数
-    try:
-        return SqliteSaver(db_path)
-    except Exception as e:
-        print(f"SqliteSaver 初始化失败，尝试使用 MemorySaver: {e}")
-        # 如果 SqliteSaver 失败，回退到 MemorySaver
-        return MemorySaver()
-
-def get_async_sqlite_saver(db_path: str = None):
+async def get_async_sqlite_saver(db_path: str = None):
     """
     获取异步 SQLite 检查点保存器
+    使用统一的 ai_interview.db 数据库
     
     Args:
         db_path (str): 数据库文件路径，如果为 None 则使用默认路径
@@ -67,25 +21,42 @@ def get_async_sqlite_saver(db_path: str = None):
     Returns:
         AsyncSqliteSaver: 异步 SQLite 检查点保存器实例
     """
-    if db_path is None:
-        # 在 backend/data 目录下存储数据库
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        backend_root = os.path.dirname(os.path.dirname(current_dir))
-        data_dir = os.path.join(backend_root, "data")
-        
-        # 确保 data 目录存在
-        os.makedirs(data_dir, exist_ok=True)
-        
-        # 数据库文件路径
-        db_path = os.path.join(data_dir, "interview_checkpoints.sqlite")
+    db_path = db_path or DB_PATH
     
-    # 使用异步 SQLite 检查点保存器
     try:
-        return AsyncSqliteSaver(db_path)
+        # 创建异步数据库连接
+        conn = await aiosqlite.connect(db_path)
+        # 使用连接创建AsyncSqliteSaver
+        saver = AsyncSqliteSaver(conn)
+        print(f"✓ LangGraph async checkpoints 将保存到: {db_path}")
+        return saver
     except Exception as e:
-        print(f"AsyncSqliteSaver 初始化失败，尝试使用 MemorySaver: {e}")
-        # 如果 AsyncSqliteSaver 失败，回退到 MemorySaver
+        print(f"✗ AsyncSqliteSaver 初始化失败: {e}")
+        print(f"  回退到 MemorySaver（数据不会持久化）")
         return MemorySaver()
+
+def get_memory_saver(use_persistence: bool = True, db_path: str = None, async_mode: bool = True):
+    """
+    获取检查点保存器（同步版本，用于向后兼容）
+    
+    注意：由于LangGraph的异步要求，建议直接使用get_async_sqlite_saver
+    
+    Args:
+        use_persistence (bool): 是否使用持久化存储，默认为 True
+        db_path (str): 数据库文件路径，如果为 None 则使用默认路径
+        async_mode (bool): 是否使用异步模式（保留参数用于兼容）
+    
+    Returns:
+        MemorySaver: 内存检查点保存器实例
+    """
+    if not use_persistence:
+        return MemorySaver()
+    
+    # 在异步环境中，返回MemorySaver
+    # 实际的持久化需要使用get_async_sqlite_saver
+    print("⚠️  注意：在异步环境中使用MemorySaver")
+    print("   如需持久化，请在异步函数中使用 await get_async_sqlite_saver()")
+    return MemorySaver()
 
 def get_memory_saver_legacy():
     """

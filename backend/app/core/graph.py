@@ -1,4 +1,5 @@
 import operator
+import asyncio
 from typing import Annotated, List, Literal,TypedDict,Union
 
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
@@ -7,7 +8,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
 from . import llms
 from . import prompt as prompt_module
-from .memory import get_memory_saver
+from .memory import get_async_sqlite_saver
 
 # 定义状态
 class InterviewState(TypedDict):
@@ -169,14 +170,14 @@ def node_router(state: InterviewState):
 # Graph 构建函数
 # ============================================================================
 
-def build_mock_interview_graph():
+async def build_mock_interview_graph():
     """
     构建模拟面试图谱
     """
     workflow = StateGraph(InterviewState)
     
-    # 获取记忆保存器（暂时使用内存存储）
-    checkpointer = get_memory_saver(use_persistence=False, async_mode=False)
+    # 获取记忆保存器（使用异步SQLite持久化）
+    checkpointer = await get_async_sqlite_saver()
 
     # 添加节点
     workflow.add_node("router", node_router)
@@ -202,14 +203,14 @@ def build_mock_interview_graph():
 
     return workflow.compile(checkpointer=checkpointer)
 
-def build_coach_interview_graph():
+async def build_coach_interview_graph():
     """
     构建辅导模式图谱
     """
     workflow = StateGraph(InterviewState)
     
-    # 获取记忆保存器（暂时使用内存存储）
-    checkpointer = get_memory_saver(use_persistence=False, async_mode=False)
+    # 获取记忆保存器（使用异步SQLite持久化）
+    checkpointer = await get_async_sqlite_saver()
 
     # 添加节点
     workflow.add_node("router", node_router)
@@ -242,12 +243,12 @@ def build_coach_interview_graph():
 # 向后兼容函数（可选）
 # ============================================================================
 
-def build_interview_graph(mode: str = "coach"):
+async def build_interview_graph(mode: str = "coach"):
     """
     工厂函数：根据模式构建对应的图谱
     向后兼容旧代码
     """
     if mode == "mock":
-        return build_mock_interview_graph()
+        return await build_mock_interview_graph()
     else:
-        return build_coach_interview_graph()
+        return await build_coach_interview_graph()

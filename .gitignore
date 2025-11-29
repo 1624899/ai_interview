@@ -5,3 +5,6 @@ data
 .env
 meta-output
 test
+package-lock.json
+web/yarn.lock
+web/build_log.txt

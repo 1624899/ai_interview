@@ -23,6 +23,7 @@ class SessionMetadata(BaseModel):
     question_count: int = Field(default=0, description="已提问数量")
     max_questions: int = Field(default=5, description="最大问题数量")
     status: Literal["active", "completed", "archived"] = Field(default="active", description="会话状态")
+    pinned: bool = Field(default=False, description="是否置顶")
 
 
 class InterviewSession(BaseModel):
@@ -45,6 +46,7 @@ class SessionListItem(BaseModel):
     status: Literal["active", "completed", "archived"] = Field(..., description="会话状态")
     message_count: int = Field(default=0, description="消息数量")
     question_count: int = Field(default=0, description="已提问数量")
+    pinned: bool = Field(default=False, description="是否置顶")
 
 
 class SessionCreateRequest(BaseModel):

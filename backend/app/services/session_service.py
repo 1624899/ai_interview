@@ -69,11 +69,11 @@ class SessionService:
                 await db.execute('''
                     INSERT INTO sessions (
                         session_id, title, created_at, updated_at, mode,
-                        resume_filename, job_description, question_count, max_questions, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        resume_filename, job_description, question_count, max_questions, status, pinned
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     session_id, title, now, now, mode,
-                    resume_filename, job_description, 0, max_questions, 'active'
+                    resume_filename, job_description, 0, max_questions, 'active', 0
                 ))
                 await db.commit()
                 
@@ -128,7 +128,8 @@ class SessionService:
                 job_description=row['job_description'],
                 question_count=row['question_count'],
                 max_questions=row['max_questions'],
-                status=row['status']
+                status=row['status'],
+                pinned=bool(row['pinned'] if row['pinned'] is not None else 0)
             )
             
             session = InterviewSession(
@@ -181,9 +182,10 @@ class SessionService:
             
             if metadata_updates:
                 for key, value in metadata_updates.items():
-                    if key in ['question_count', 'max_questions', 'resume_filename', 'job_description']:
+                    if key in ['question_count', 'max_questions', 'resume_filename', 'job_description', 'pinned']:
                         updates.append(f'{key} = ?')
-                        params.append(value)
+                        # SQLite 使用 INTEGER 存储布尔值
+                        params.append(1 if value else 0) if key == 'pinned' else params.append(value)
             
             # 总是更新 updated_at
             updates.append('updated_at = ?')
@@ -276,17 +278,17 @@ class SessionService:
             
             where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
             
-            # 查询会话列表
+            # 查询会话列表（置顶的会话排在前面）
             sql = f'''
                 SELECT 
                     s.session_id, s.title, s.created_at, s.updated_at,
-                    s.mode, s.status, s.question_count,
+                    s.mode, s.status, s.question_count, s.pinned,
                     COUNT(m.id) as message_count
                 FROM sessions s
                 LEFT JOIN messages m ON s.session_id = m.session_id
                 {where_clause}
                 GROUP BY s.session_id
-                ORDER BY s.updated_at DESC
+                ORDER BY s.pinned DESC, s.updated_at DESC
                 LIMIT ? OFFSET ?
             '''
             
@@ -304,7 +306,8 @@ class SessionService:
                         mode=row['mode'],
                         status=row['status'],
                         message_count=row['message_count'],
-                        question_count=row['question_count']
+                        question_count=row['question_count'],
+                        pinned=bool(row['pinned'] if row['pinned'] is not None else 0)
                     ))
                 
                 return sessions

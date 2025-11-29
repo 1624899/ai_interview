@@ -16,6 +16,8 @@ interface SessionSidebarProps {
     onModeChange: (mode: 'coach' | 'mock') => void;
     sessions: SessionListItem[];
     onDeleteSession: (sessionId: string) => void;
+    onEditSession?: (sessionId: string, newTitle: string) => void;
+    onTogglePin?: (sessionId: string, pinned: boolean) => void;
     loading?: boolean;
 }
 
@@ -29,6 +31,8 @@ export function SessionSidebar({
     onModeChange,
     sessions,
     onDeleteSession,
+    onEditSession,
+    onTogglePin,
     loading
 }: SessionSidebarProps) {
     return (
@@ -114,6 +118,8 @@ export function SessionSidebar({
                             sessions={sessions}
                             onSessionSelect={onSessionSelect}
                             onDeleteSession={onDeleteSession}
+                            onEditSession={onEditSession}
+                            onTogglePin={onTogglePin}
                             currentSessionId={currentSessionId}
                             mode={mode}
                             loading={loading}

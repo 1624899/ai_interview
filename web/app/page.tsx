@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Upload, FileText, Loader2, PanelLeft, Bot, Sparkles, GraduationCap, Timer, Maximize2 } from "lucide-react";
+import { Upload, FileText, Loader2, PanelLeft, Bot, Sparkles, GraduationCap, Timer, Maximize2, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "@/components/ChatMessage";
@@ -23,7 +23,6 @@ import {
 export default function InterviewPage() {
   const [showSidebar, setShowSidebar] = useState(true);
   const [input, setInput] = useState("");
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [jobDescription, setJobDescription] = useState("");
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
   const [tempJobDescription, setTempJobDescription] = useState("");
@@ -43,7 +42,8 @@ export default function InterviewPage() {
     setThreadId,
     clearMessages,
     restoreMessages,
-    rollbackChat
+    rollbackChat,
+    stopStreaming
   } = useInterviewChat();
 
   const {
@@ -54,6 +54,8 @@ export default function InterviewPage() {
     clearCurrentSession,
     fetchSessions,
     deleteSession,
+    togglePinSession,
+    updateSessionTitle,
     loading: sessionLoading
   } = useSessionManagement();
 
@@ -67,13 +69,36 @@ export default function InterviewPage() {
     const content = input;
     setInput("");
 
-    if (editingIndex !== null) {
-      // 如果是编辑模式，先回退到该消息之前的状态
-      await rollbackChat(editingIndex);
-      setEditingIndex(null);
+    await sendMessage(content, threadId, jobDescription);
+  };
+
+  const handleEditMessage = async (index: number, newContent: string) => {
+    if (isStreaming) return;
+
+    // 回退到该消息之前的状态
+    await rollbackChat(index);
+
+    // 直接发送编辑后的消息
+    await sendMessage(newContent, threadId, jobDescription);
+  };
+
+  const handleRegenerateMessage = async (aiMessageIndex: number) => {
+    if (isStreaming) return;
+
+    // 找到对应的用户消息（AI消息的前一条应该是用户消息）
+    const userMessageIndex = aiMessageIndex - 1;
+    if (userMessageIndex < 0 || messages[userMessageIndex].role !== 'user') {
+      console.error('无法找到对应的用户消息');
+      return;
     }
 
-    await sendMessage(content, false, threadId, jobDescription);
+    const userMessage = messages[userMessageIndex];
+
+    // 回退到用户消息之前的状态（删除用户消息和AI回复）
+    await rollbackChat(userMessageIndex);
+
+    // 重新发送原有的用户消息
+    await sendMessage(userMessage.content, threadId, jobDescription);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,6 +156,16 @@ export default function InterviewPage() {
     setJobDescription(""); // 重置岗位描述
   };
 
+  // 处理编辑会话标题
+  const handleEditSession = async (sessionId: string, newTitle: string) => {
+    await updateSessionTitle(sessionId, newTitle);
+  };
+
+  // 处理置顶会话
+  const handleTogglePin = async (sessionId: string, pinned: boolean) => {
+    await togglePinSession(sessionId, pinned);
+  };
+
   // 判断是否显示欢迎页（没有消息且没有当前会话）
   const showWelcome = messages.length === 0 && !currentSession;
 
@@ -148,6 +183,8 @@ export default function InterviewPage() {
         onModeChange={setMode}
         sessions={sessions}
         onDeleteSession={deleteSession}
+        onEditSession={handleEditSession}
+        onTogglePin={handleTogglePin}
         loading={sessionLoading}
       />
 
@@ -326,15 +363,13 @@ export default function InterviewPage() {
           /* 聊天界面 */
           <>
             <ScrollArea className="h-full w-full">
-              <div className="max-w-3xl mx-auto px-4 py-10 space-y-6 pb-32">
+              <div className="max-w-3xl mx-auto px-4 py-10 space-y-6 pb-48">
                 {messages.map((m, i) => (
                   <ChatMessage
                     key={i}
                     {...m}
-                    onEdit={(content) => {
-                      setInput(content);
-                      setEditingIndex(i);
-                    }}
+                    onEdit={m.role === 'user' ? (content) => handleEditMessage(i, content) : undefined}
+                    onRegenerate={m.role === 'ai' ? () => handleRegenerateMessage(i) : undefined}
                   />
                 ))}
                 {isStreaming && messages[messages.length - 1]?.role !== 'ai' && (
@@ -367,17 +402,21 @@ export default function InterviewPage() {
                     size="icon"
                     className={cn(
                       "absolute right-2 bottom-2 h-9 w-9 transition-all",
-                      input.trim() ? "bg-teal-600 hover:bg-teal-700" : "bg-gray-100 text-gray-400"
+                      isStreaming || input.trim()
+                        ? "bg-teal-600 hover:bg-teal-700"
+                        : "bg-gray-100 text-gray-400"
                     )}
-                    onClick={handleSend}
-                    disabled={isStreaming || !input.trim()}
+                    onClick={isStreaming ? stopStreaming : handleSend}
+                    disabled={!isStreaming && !input.trim()}
                   >
-                    {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="sr-only">发送</span>}
-                    {!isStreaming && (
+                    {isStreaming ? (
+                      <Square className="h-4 w-4" fill="currentColor" />
+                    ) : (
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     )}
+                    <span className="sr-only">{isStreaming ? '暂停' : '发送'}</span>
                   </Button>
                 </div>
                 <p className="text-center text-xs text-gray-400 mt-3">

@@ -10,6 +10,22 @@ from . import llms
 from . import prompt as prompt_module
 from .memory import get_async_sqlite_saver
 
+# 全局变量用于跟踪图实例
+_graph_instances = []
+
+def register_graph_instance(graph):
+    """注册图实例以便后续清理"""
+    _graph_instances.append(graph)
+    return graph
+
+def get_graph_instances():
+    """获取所有图实例"""
+    return _graph_instances
+
+def clear_graph_instances():
+    """清空图实例列表"""
+    _graph_instances.clear()
+
 # 定义状态
 class InterviewState(TypedDict):
     """
@@ -201,7 +217,8 @@ async def build_mock_interview_graph():
     workflow.add_edge("interviewer", END)
     workflow.add_edge("feedback_generator", END)
 
-    return workflow.compile(checkpointer=checkpointer)
+    graph = workflow.compile(checkpointer=checkpointer)
+    return register_graph_instance(graph)
 
 async def build_coach_interview_graph():
     """
@@ -237,7 +254,8 @@ async def build_coach_interview_graph():
     workflow.add_edge("analysis", "feedback_generator")
     workflow.add_edge("feedback_generator", END)
 
-    return workflow.compile(checkpointer=checkpointer)
+    graph = workflow.compile(checkpointer=checkpointer)
+    return register_graph_instance(graph)
 
 # ============================================================================
 # 向后兼容函数（可选）

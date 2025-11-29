@@ -16,6 +16,7 @@ export interface SessionMetadata {
     question_count: number;
     max_questions: number;
     status: 'active' | 'completed' | 'archived';
+    pinned?: boolean;
 }
 
 export interface InterviewSession {
@@ -36,6 +37,7 @@ export interface SessionListItem {
     status: 'active' | 'completed' | 'archived';
     message_count: number;
     question_count: number;
+    pinned?: boolean;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -235,6 +237,98 @@ export function useSessionManagement() {
         setCurrentSession(null);
     }, []);
 
+    // 切换置顶状态
+    const togglePinSession = useCallback(async (sessionId: string, pinned: boolean) => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    metadata: { pinned }
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('更新置顶状态失败');
+            }
+
+            const data = await response.json();
+
+            // 更新列表中的会话
+            setSessions(prev =>
+                prev.map(s => s.session_id === sessionId
+                    ? { ...s, pinned, updated_at: data.session.updated_at }
+                    : s
+                ).sort((a, b) => {
+                    // 置顶的排在前面
+                    if (a.pinned !== b.pinned) {
+                        return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+                    }
+                    // 相同置顶状态按更新时间排序
+                    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+                })
+            );
+
+            return data.session;
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : '更新置顶状态失败';
+            setError(errorMessage);
+            console.error('更新置顶状态错误:', err);
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // 更新会话标题
+    const updateSessionTitle = useCallback(async (sessionId: string, title: string) => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ title }),
+            });
+
+            if (!response.ok) {
+                throw new Error('更新标题失败');
+            }
+
+            const data = await response.json();
+
+            // 更新列表中的会话
+            setSessions(prev =>
+                prev.map(s => s.session_id === sessionId
+                    ? { ...s, title, updated_at: data.session.updated_at }
+                    : s
+                )
+            );
+
+            // 如果是当前会话，也更新当前会话
+            if (currentSession?.session_id === sessionId) {
+                setCurrentSession(data.session);
+            }
+
+            return data.session;
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : '更新标题失败';
+            setError(errorMessage);
+            console.error('更新标题错误:', err);
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    }, [currentSession]);
+
     return {
         // 状态
         sessions,
@@ -249,5 +343,7 @@ export function useSessionManagement() {
         updateSession,
         deleteSession,
         clearCurrentSession,
+        togglePinSession,
+        updateSessionTitle,
     };
 }

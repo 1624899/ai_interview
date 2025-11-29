@@ -5,6 +5,3 @@ data
 .env
 meta-output
 test
-/web/package-lock.json
-/web/node_modules
-/web/.next

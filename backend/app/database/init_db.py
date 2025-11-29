@@ -35,7 +35,8 @@ def init_database():
                 job_description TEXT,
                 question_count INTEGER DEFAULT 0,
                 max_questions INTEGER DEFAULT 5,
-                status TEXT DEFAULT 'active'
+                status TEXT DEFAULT 'active',
+                pinned INTEGER DEFAULT 0
             )
         ''')
         logger.info("✓ sessions 表已创建/验证")
@@ -71,6 +72,11 @@ def init_database():
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_session_mode 
             ON sessions(mode)
+        ''')
+        
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_session_pinned 
+            ON sessions(pinned DESC, updated_at DESC)
         ''')
         
         # 消息表索引

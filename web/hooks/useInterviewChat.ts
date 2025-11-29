@@ -36,6 +36,7 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
     const [isStreaming, setIsStreaming] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [threadId, setThreadId] = useState<string>("");
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     // 初始化线程ID
     React.useEffect(() => {
@@ -44,67 +45,22 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
         }
     }, [threadId]);
 
-    const startInterview = useCallback(async (
-        jobDescription: string,
-        currentResume: ResumeInfo | null = resume,
-        currentMode: InterviewMode = mode,
-        currentThreadId: string = threadId
-    ) => {
-        if (!currentResume) return;
-
-        setIsLoading(true);
-        setMessages([]); // 新面试时清空消息
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/chat/start`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    thread_id: currentThreadId,
-                    resume_context: currentResume.content,
-                    job_description: jobDescription,
-                    mode: currentMode,
-                    max_questions: 5
-                })
-            });
-
-            if (!response.ok) throw new Error('启动面试失败');
-
-            // 获取后端生成的标题（如果有返回）
-            const data = await response.json();
-
-            // 发送隐藏消息触发AI第一个问题
-            await sendMessage("请根据我的简历和岗位描述开始面试，提出第一个问题。", true, currentThreadId, jobDescription);
-
-        } catch (error) {
-            console.error('启动面试时出错:', error);
-            setMessages(prev => [...prev, { role: 'system', content: '启动面试会话失败。' }]);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [resume, mode, threadId]);
-
     const sendMessage = useCallback(async (
         content: string,
-        hidden: boolean = false,
         currentThreadId: string = threadId,
         currentJobDescription: string = ""
     ) => {
         if (isStreaming) return;
 
-        if (!hidden) {
-            setMessages(prev => [...prev, { role: 'user', content }]);
-        }
+        // 始终显示消息，保持前后端索引一致
+        setMessages(prev => [...prev, { role: 'user', content }]);
 
         setIsStreaming(true);
 
-        try {
-            // 确保会话存在 - 先调用 /api/chat/start (如果需要确保状态)
-            // 注意：通常startInterview已经调用过start，这里再次调用可能会重置状态？
-            // 实际上 /api/chat/start 是幂等的吗？如果是"开始新会话"，可能不是。
-            // 但这里我们假设 sendMessage 是在会话建立后调用的。
-            // 为了安全，我们只调用 stream。如果后端需要状态，它应该从 thread_id 恢复。
+        // 创建新的 AbortController
+        abortControllerRef.current = new AbortController();
 
+        try {
             const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -115,7 +71,8 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
                     job_description: currentJobDescription || "通用软件工程师",
                     mode: mode,
                     max_questions: 5
-                })
+                }),
+                signal: abortControllerRef.current?.signal
             });
 
             if (!response.ok) throw new Error('发送消息失败');
@@ -162,11 +119,17 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
                 }
             }
 
-        } catch (error) {
-            console.error('发送消息时出错:', error);
-            setMessages(prev => [...prev, { role: 'system', content: '发送消息失败，请重试。' }]);
+        } catch (error: any) {
+            // 如果是用户主动取消，不显示错误消息
+            if (error.name === 'AbortError') {
+                console.log('流式输出已被用户暂停');
+            } else {
+                console.error('发送消息时出错:', error);
+                setMessages(prev => [...prev, { role: 'system', content: '发送消息失败，请重试。' }]);
+            }
         } finally {
             setIsStreaming(false);
+            abortControllerRef.current = null;
             setMessages(prev => {
                 const newMessages = [...prev];
                 const lastMsg = newMessages[newMessages.length - 1];
@@ -177,6 +140,54 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
             });
         }
     }, [resume, mode, threadId, isStreaming]);
+
+    const startInterview = useCallback(async (
+        jobDescription: string,
+        currentResume: ResumeInfo | null = resume,
+        currentMode: InterviewMode = mode,
+        currentThreadId: string = threadId
+    ) => {
+        if (!currentResume) return;
+
+        setIsLoading(true);
+        setMessages([]); // 新面试时清空消息
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/chat/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    thread_id: currentThreadId,
+                    resume_context: currentResume.content,
+                    job_description: jobDescription,
+                    mode: currentMode,
+                    max_questions: 5
+                })
+            });
+
+            if (!response.ok) throw new Error('启动面试失败');
+
+            // 获取后端生成的标题（如果有返回）
+            const data = await response.json();
+
+            // 发送消息触发AI第一个问题（现在不再隐藏，直接显示）
+            await sendMessage("请根据我的简历和岗位描述开始面试，提出第一个问题。", currentThreadId, jobDescription);
+
+        } catch (error) {
+            console.error('启动面试时出错:', error);
+            setMessages(prev => [...prev, { role: 'system', content: '启动面试会话失败。' }]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [resume, mode, threadId, sendMessage]);
+
+    // 暂停流式输出
+    const stopStreaming = useCallback(() => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+    }, []);
 
     const uploadResume = useCallback(async (file: File) => {
         setIsLoading(true);
@@ -199,16 +210,13 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
             };
             setResume(newResume);
 
-            // 移除系统提示消息
-            // setMessages(prev => [...prev, { role: 'system', content: `简历"${file.name}"上传成功。您现在可以开始面试了。` }]);
-
         } catch (error) {
             console.error('上传简历时出错:', error);
             setMessages(prev => [...prev, { role: 'system', content: '上传简历失败。' }]);
         } finally {
             setIsLoading(false);
         }
-    }, [mode]); // 移除startInterview依赖以避免循环依赖（如果我们不在这里调用它）
+    }, [mode]);
 
     const clearMessages = useCallback(() => {
         setMessages([]);
@@ -231,6 +239,7 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
 
     const rollbackChat = useCallback(async (index: number) => {
         try {
+            // 前端现在显示所有消息，索引与后端一致，无需调整
             const response = await fetch(`${API_BASE_URL}/api/chat/rollback`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -265,6 +274,7 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
         addMessage,
         threadId,
         setThreadId,
-        rollbackChat
+        rollbackChat,
+        stopStreaming
     };
 }

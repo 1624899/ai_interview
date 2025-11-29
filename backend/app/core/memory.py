@@ -10,6 +10,22 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from app.database import DB_PATH
 
+# 全局变量用于跟踪 SQLite 连接
+_tracked_connections = []
+
+def track_connection(conn):
+    """跟踪 SQLite 连接以便后续清理"""
+    _tracked_connections.append(conn)
+    return conn
+
+def get_tracked_connections():
+    """获取所有被跟踪的连接"""
+    return _tracked_connections
+
+def clear_tracked_connections():
+    """清空被跟踪的连接列表"""
+    _tracked_connections.clear()
+
 async def get_async_sqlite_saver(db_path: str = None):
     """
     获取异步 SQLite 检查点保存器
@@ -26,6 +42,8 @@ async def get_async_sqlite_saver(db_path: str = None):
     try:
         # 创建异步数据库连接
         conn = await aiosqlite.connect(db_path)
+        # 跟踪连接以便后续清理
+        track_connection(conn)
         # 使用连接创建AsyncSqliteSaver
         saver = AsyncSqliteSaver(conn)
         print(f"✓ LangGraph async checkpoints 将保存到: {db_path}")

@@ -53,34 +53,3 @@ async def get_async_sqlite_saver(db_path: str = None):
         print(f"  回退到 MemorySaver（数据不会持久化）")
         return MemorySaver()
 
-def get_memory_saver(use_persistence: bool = True, db_path: str = None, async_mode: bool = True):
-    """
-    获取检查点保存器（同步版本，用于向后兼容）
-    
-    注意：由于LangGraph的异步要求，建议直接使用get_async_sqlite_saver
-    
-    Args:
-        use_persistence (bool): 是否使用持久化存储，默认为 True
-        db_path (str): 数据库文件路径，如果为 None 则使用默认路径
-        async_mode (bool): 是否使用异步模式（保留参数用于兼容）
-    
-    Returns:
-        MemorySaver: 内存检查点保存器实例
-    """
-    if not use_persistence:
-        return MemorySaver()
-    
-    # 在异步环境中，返回MemorySaver
-    # 实际的持久化需要使用get_async_sqlite_saver
-    print("⚠️  注意：在异步环境中使用MemorySaver")
-    print("   如需持久化，请在异步函数中使用 await get_async_sqlite_saver()")
-    return MemorySaver()
-
-def get_memory_saver_legacy():
-    """
-    获取内存检查点保存器（向后兼容）
-    
-    Returns:
-        MemorySaver: 检查点保存器实例
-    """
-    return MemorySaver()

@@ -42,14 +42,21 @@ async def start_interview(request: InterviewStartRequest):
         # 配置线程 ID
         config = {"configurable": {"thread_id": request.thread_id}}
         
-        # 构建初始状态
+        # 构建初始状态（新架构）
         inputs = {
             "messages": [],
             "resume_context": request.resume_context,
             "job_description": request.job_description,
+            "company_info": getattr(request, "company_info", "未知"),
             "mode": request.mode,
-            "question_count": 0,
-            "max_questions": request.max_questions
+            "interview_plan": [],  # 将由 planner 节点填充
+            "current_question_index": 0,
+            "max_questions": request.max_questions,
+            "eval_status": "start_new",
+            "eval_reason": "",
+            "follow_up_count": 0,
+            "clarify_count": 0,
+            "question_count": 0
         }
         
         # 检查会话是否已存在，如果不存在则创建
@@ -111,14 +118,21 @@ async def stream_chat(request: ChatRequest):
         # 配置线程 ID
         config = {"configurable": {"thread_id": request.thread_id}}
         
-        # 构建输入状态
+        # 构建输入状态（新架构）
         inputs = {
             "messages": [HumanMessage(content=request.message)],
             "resume_context": request.resume_context,
             "job_description": request.job_description,
+            "company_info": getattr(request, "company_info", "未知"),
             "mode": request.mode,
-            "question_count": 0,  # 这个值会从数据库中恢复
-            "max_questions": request.max_questions
+            "interview_plan": [],  # 会从 checkpoint 恢复
+            "current_question_index": 0,  # 会从 checkpoint 恢复
+            "max_questions": request.max_questions,
+            "eval_status": "start_new",
+            "eval_reason": "",
+            "follow_up_count": 0,
+            "clarify_count": 0,
+            "question_count": 0  # 这个值会从数据库中恢复
         }
         
         return StreamingResponse(
@@ -190,7 +204,7 @@ async def event_generator(graph, inputs, config, thread_id: str, user_message: s
                     if "question_count" in output:
                         # 更新会话元数据
                         await session_service.update_session(
-            session_id=thread_id,
+                            session_id=thread_id,
                             metadata_updates={
                                 "question_count": output["question_count"]
                             }

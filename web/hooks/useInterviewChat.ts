@@ -36,6 +36,7 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
     const [isStreaming, setIsStreaming] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [threadId, setThreadId] = useState<string>("");
+    const [interviewProgress, setInterviewProgress] = useState<{ current: number; total: number } | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
     // 初始化线程ID
@@ -48,7 +49,8 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
     const sendMessage = useCallback(async (
         content: string,
         currentThreadId: string = threadId,
-        currentJobDescription: string = ""
+        currentJobDescription: string = "",
+        currentCompanyInfo: string = ""
     ) => {
         if (isStreaming) return;
 
@@ -69,6 +71,7 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
                     message: content,
                     resume_context: resume?.content || "",
                     job_description: currentJobDescription || "通用软件工程师",
+                    company_info: currentCompanyInfo || "未知",
                     mode: mode,
                     max_questions: 5
                 }),
@@ -109,6 +112,19 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
                                     }
                                     return newMessages;
                                 });
+                            } else if (data.type === 'state_update') {
+                                // 处理状态更新，提取面试进度信息
+                                try {
+                                    const stateData = JSON.parse(data.content);
+                                    if (stateData.question_count !== undefined && stateData.max_questions !== undefined) {
+                                        setInterviewProgress({
+                                            current: stateData.question_count,
+                                            total: stateData.max_questions
+                                        });
+                                    }
+                                } catch (e) {
+                                    console.error('解析状态更新时出错:', e);
+                                }
                             } else if (data.type === 'error') {
                                 console.error('流错误:', data.content);
                             }
@@ -145,7 +161,8 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
         jobDescription: string,
         currentResume: ResumeInfo | null = resume,
         currentMode: InterviewMode = mode,
-        currentThreadId: string = threadId
+        currentThreadId: string = threadId,
+        currentCompanyInfo: string = ""
     ) => {
         if (!currentResume) return;
 
@@ -160,6 +177,7 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
                     thread_id: currentThreadId,
                     resume_context: currentResume.content,
                     job_description: jobDescription,
+                    company_info: currentCompanyInfo || "未知",
                     mode: currentMode,
                     max_questions: 5
                 })
@@ -171,7 +189,7 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
             const data = await response.json();
 
             // 发送消息触发AI第一个问题（现在不再隐藏，直接显示）
-            await sendMessage("请根据我的简历和岗位描述开始面试，提出第一个问题。", currentThreadId, jobDescription);
+            await sendMessage("请根据我的简历和岗位描述开始面试，提出第一个问题。", currentThreadId, jobDescription, currentCompanyInfo);
 
         } catch (error) {
             console.error('启动面试时出错:', error);
@@ -275,6 +293,8 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
         threadId,
         setThreadId,
         rollbackChat,
-        stopStreaming
+        stopStreaming,
+        interviewProgress,
+        setInterviewProgress
     };
 }

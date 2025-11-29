@@ -14,6 +14,7 @@ class ChatRequest(BaseModel):
     mode: Literal["coach", "mock"] = Field(default="coach", description="面试模式")
     resume_context: str = Field(..., description="简历上下文")
     job_description: str = Field(..., description="岗位描述")
+    company_info: str = Field(default="未知", description="公司背景信息")
     max_questions: int = Field(default=5, description="最大问题数量")
 
 
@@ -55,6 +56,7 @@ class InterviewStartRequest(BaseModel):
     mode: Literal["coach", "mock"] = Field(..., description="面试模式")
     resume_context: str = Field(..., description="简历上下文")
     job_description: str = Field(..., description="岗位描述")
+    company_info: str = Field(default="未知", description="公司背景信息")
     max_questions: int = Field(default=5, description="最大问题数量")
 
 

@@ -24,6 +24,8 @@ export default function InterviewPage() {
   const [showSidebar, setShowSidebar] = useState(true);
   const [input, setInput] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+  const [companyInfo, setCompanyInfo] = useState(""); // 新增：公司信息
+  const [interviewProgress, setInterviewProgress] = useState<{ current: number; total: number } | null>(null); // 新增：面试进度
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
   const [tempJobDescription, setTempJobDescription] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -43,7 +45,9 @@ export default function InterviewPage() {
     clearMessages,
     restoreMessages,
     rollbackChat,
-    stopStreaming
+    stopStreaming,
+    interviewProgress: hookInterviewProgress,
+    setInterviewProgress: setHookInterviewProgress
   } = useInterviewChat();
 
   const {
@@ -69,7 +73,7 @@ export default function InterviewPage() {
     const content = input;
     setInput("");
 
-    await sendMessage(content, threadId, jobDescription);
+    await sendMessage(content, threadId, jobDescription, companyInfo);
   };
 
   const handleEditMessage = async (index: number, newContent: string) => {
@@ -79,7 +83,7 @@ export default function InterviewPage() {
     await rollbackChat(index);
 
     // 直接发送编辑后的消息
-    await sendMessage(newContent, threadId, jobDescription);
+    await sendMessage(newContent, threadId, jobDescription, companyInfo);
   };
 
   const handleRegenerateMessage = async (aiMessageIndex: number) => {
@@ -98,7 +102,7 @@ export default function InterviewPage() {
     await rollbackChat(userMessageIndex);
 
     // 重新发送原有的用户消息
-    await sendMessage(userMessage.content, threadId, jobDescription);
+    await sendMessage(userMessage.content, threadId, jobDescription, companyInfo);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,7 +122,7 @@ export default function InterviewPage() {
 
         // 2. 启动面试流程 (后端初始化 + 触发 AI 首句)
         try {
-          await startInterview(jobDescription.trim(), resume, mode, newThreadId);
+          await startInterview(jobDescription.trim(), resume, mode, newThreadId, companyInfo.trim());
 
           // 3. 刷新会话列表以获取后端生成的最新标题
           await fetchSessions('active', mode);
@@ -207,21 +211,24 @@ export default function InterviewPage() {
 
         {showWelcome ? (
           /* 欢迎页 / 新建会话页 */
-          <div className="flex-1 flex flex-col items-center justify-center p-6 animate-in fade-in duration-500">
-            <div className="max-w-2xl w-full space-y-10 text-center">
+          <div className="flex-1 flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 relative">
 
-              {/* Logo & 标题 */}
-              <div className="space-y-4">
-                <div className="w-20 h-20 bg-teal-600 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-teal-200">
-                  <Bot className="w-10 h-10 text-white" />
-                </div>
-                <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+            {/* Logo & 标题 - 移动到左上角 */}
+            <div className="absolute top-8 left-8 flex items-center gap-4 z-10">
+              <div className="w-14 h-14 bg-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-teal-200">
+                <Bot className="w-7 h-7 text-white" />
+              </div>
+              <div className="text-left">
+                <h1 className="text-2xl font-bold tracking-tight text-gray-900">
                   面试<span className="text-teal-600">.AI</span>
                 </h1>
-                <p className="text-lg text-gray-500 max-w-md mx-auto">
-                  您的智能面试教练。上传简历，选择模式，开始模拟面试。
+                <p className="text-sm text-gray-500 max-w-md">
+                  您的智能面试教练。
                 </p>
               </div>
+            </div>
+
+            <div className="max-w-2xl w-full text-center mt-16">
 
               {/* 核心操作区域 */}
               <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-6 text-left">
@@ -304,6 +311,25 @@ export default function InterviewPage() {
                   </div>
                 </div>
 
+                {/* 2.5. 输入公司信息 (非必填) */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                    <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">选填</span>
+                    公司信息
+                  </label>
+
+                  <input
+                    type="text"
+                    value={companyInfo}
+                    onChange={(e) => setCompanyInfo(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm transition-all hover:border-teal-500 hover:ring-2 hover:ring-teal-50 focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none"
+                    placeholder="例如：大厂、创业公司、外企等（可选）"
+                  />
+                  <p className="text-xs text-gray-400">
+                    提供公司信息可以让面试题目更贴近实际场景
+                  </p>
+                </div>
+
                 {/* 3. 选择模式 */}
                 <div className="space-y-3">
                   <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
@@ -362,6 +388,41 @@ export default function InterviewPage() {
         ) : (
           /* 聊天界面 */
           <>
+            {/* 面试进度条 */}
+            {interviewProgress && interviewProgress.total > 0 && (
+              <div className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+                <div className="max-w-3xl mx-auto px-6 py-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></div>
+                        <span className="font-medium text-gray-700">面试进行中</span>
+                      </div>
+                      <span className="text-gray-400">·</span>
+                      <span className="text-gray-500">
+                        问题 <span className="font-semibold text-teal-600">{interviewProgress.current}</span>
+                        <span className="text-gray-400 mx-1">/</span>
+                        <span className="font-semibold text-gray-700">{interviewProgress.total}</span>
+                      </span>
+                    </div>
+
+                    {/* 进度条 */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-teal-500 to-teal-600 rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${(interviewProgress.current / interviewProgress.total) * 100}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-xs font-medium text-gray-400">
+                        {Math.round((interviewProgress.current / interviewProgress.total) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <ScrollArea className="h-full w-full">
               <div className="max-w-3xl mx-auto px-4 py-10 space-y-6 pb-48">
                 {messages.map((m, i) => (

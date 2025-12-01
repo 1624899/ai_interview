@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Upload, FileText, Loader2, PanelLeft, Bot, Sparkles, GraduationCap, Timer, Maximize2, Square } from "lucide-react";
+import { Upload, FileText, Loader2, PanelLeft, Bot, Sparkles, GraduationCap, Timer, Maximize2, Square, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "@/components/ChatMessage";
@@ -29,6 +29,10 @@ export default function InterviewPage() {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
   const [tempJobDescription, setTempJobDescription] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
 
   const {
     messages,
@@ -73,8 +77,48 @@ export default function InterviewPage() {
     const content = input;
     setInput("");
 
+    // 发送消息时强制滚动到底部
+    setAutoScrollEnabled(true);
+    setShowScrollButton(false);
+    // 使用 setTimeout 确保在 UI 更新后滚动
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+
     await sendMessage(content, threadId, jobDescription, companyInfo);
   };
+
+  // 处理滚动事件
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    // 距离底部 100px 以内视为在底部
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+
+    if (isAtBottom) {
+      setShowScrollButton(false);
+      setAutoScrollEnabled(true);
+    } else {
+      setShowScrollButton(true);
+      // 如果用户主动向上滚动，暂停自动滚动
+      if (autoScrollEnabled && scrollHeight - scrollTop - clientHeight > 100) {
+        setAutoScrollEnabled(false);
+      }
+    }
+  };
+
+  // 滚动到底部
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowScrollButton(false);
+    setAutoScrollEnabled(true);
+  };
+
+  // 自动滚动效果
+  useEffect(() => {
+    if (autoScrollEnabled) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, autoScrollEnabled]);
 
   const handleEditMessage = async (index: number, newContent: string) => {
     if (isStreaming) return;
@@ -88,6 +132,14 @@ export default function InterviewPage() {
 
   const handleRegenerateMessage = async (aiMessageIndex: number) => {
     if (isStreaming) return;
+
+    // 特殊处理：如果是第一条消息（AI开场白），则重新开始面试流程
+    // 因为第一条消息没有前置的用户消息（是由空消息触发的）
+    if (aiMessageIndex === 0) {
+      await rollbackChat(0);
+      await sendMessage("", threadId, jobDescription, companyInfo);
+      return;
+    }
 
     // 找到对应的用户消息（AI消息的前一条应该是用户消息）
     const userMessageIndex = aiMessageIndex - 1;
@@ -423,7 +475,11 @@ export default function InterviewPage() {
               </div>
             )}
 
-            <ScrollArea className="h-full w-full">
+            <ScrollArea
+              className="h-full w-full"
+              viewportRef={scrollViewportRef}
+              onScroll={handleScroll}
+            >
               <div className="max-w-3xl mx-auto px-4 py-10 space-y-6 pb-48">
                 {messages.map((m, i) => (
                   <ChatMessage
@@ -439,12 +495,28 @@ export default function InterviewPage() {
                     AI 正在思考...
                   </div>
                 )}
+                <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
 
             {/* 底部输入框 */}
             <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white/95 to-transparent">
               <div className="max-w-3xl mx-auto relative">
+                {/* 跳转到底部按钮 - 移动到输入框上方 */}
+                {showScrollButton && (
+                  <div className="absolute -top-12 left-0 right-0 flex justify-center z-20 pointer-events-none">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="rounded-full shadow-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 gap-2 pointer-events-auto animate-in fade-in zoom-in duration-300"
+                      onClick={scrollToBottom}
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                      <span>回到底部</span>
+                    </Button>
+                  </div>
+                )}
+
                 <div className="relative bg-white rounded-2xl shadow-lg border border-gray-200 focus-within:ring-2 focus-within:ring-teal-100 transition-all">
                   <Textarea
                     placeholder="输入您的回答..."

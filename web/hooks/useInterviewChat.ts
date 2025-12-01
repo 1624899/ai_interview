@@ -54,8 +54,10 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
     ) => {
         if (isStreaming) return;
 
-        // 始终显示消息，保持前后端索引一致
-        setMessages(prev => [...prev, { role: 'user', content }]);
+        // 只在非空消息时添加用户消息
+        if (content.trim()) {
+            setMessages(prev => [...prev, { role: 'user', content }]);
+        }
 
         setIsStreaming(true);
 
@@ -188,8 +190,8 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
             // 获取后端生成的标题（如果有返回）
             const data = await response.json();
 
-            // 发送消息触发AI第一个问题（现在不再隐藏，直接显示）
-            await sendMessage("请根据我的简历和岗位描述开始面试，提出第一个问题。", currentThreadId, jobDescription, currentCompanyInfo);
+            // ✅ 修复：初始化后通过发送空消息来触发后端 Planner 生成第一个问题
+            await sendMessage("", currentThreadId, jobDescription, currentCompanyInfo);
 
         } catch (error) {
             console.error('启动面试时出错:', error);

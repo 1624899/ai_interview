@@ -165,22 +165,18 @@ export default function InterviewPage() {
 
   const handleStartInterview = async () => {
     if (resume && jobDescription.trim()) {
-      // 1. 创建新会话 (前端管理)
-      const newSession = await createSession(mode, jobDescription.trim(), jobDescription.trim(), 5);
+      // 生成新的 thread_id
+      const newThreadId = uuidv4();
+      setThreadId(newThreadId);
 
-      if (newSession) {
-        const newThreadId = newSession.session_id;
-        setThreadId(newThreadId);
+      // 启动面试流程（后端会自动创建会话并保存完整信息）
+      try {
+        await startInterview(jobDescription.trim(), resume, mode, newThreadId, companyInfo.trim());
 
-        // 2. 启动面试流程 (后端初始化 + 触发 AI 首句)
-        try {
-          await startInterview(jobDescription.trim(), resume, mode, newThreadId, companyInfo.trim());
-
-          // 3. 刷新会话列表以获取后端生成的最新标题
-          await fetchSessions('active', mode);
-        } catch (error) {
-          console.error('启动面试时出错:', error);
-        }
+        // 刷新会话列表以获取后端生成的最新会话
+        await fetchSessions('active', mode);
+      } catch (error) {
+        console.error('启动面试时出错:', error);
       }
     }
   };

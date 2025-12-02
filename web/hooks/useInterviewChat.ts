@@ -178,6 +178,7 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
                 body: JSON.stringify({
                     thread_id: currentThreadId,
                     resume_context: currentResume.content,
+                    resume_filename: currentResume.filename,
                     job_description: jobDescription,
                     company_info: currentCompanyInfo || "未知",
                     mode: currentMode,

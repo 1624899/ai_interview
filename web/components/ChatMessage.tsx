@@ -120,20 +120,32 @@ export function ChatMessage({ role, content, isStreaming, onEdit, onCancelEdit, 
                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                         rehypePlugins={[rehypeHighlight as any]}
                                         components={{
-                                            // 自定义代码块样式
+                                            // 自定义 pre 标签（代码块容器）
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            pre({ children, ...props }: any) {
+                                                return (
+                                                    <pre className="bg-zinc-950 p-3 rounded-md my-2 overflow-x-auto text-xs text-white" {...props}>
+                                                        {children}
+                                                    </pre>
+                                                );
+                                            },
+                                            // 自定义 code 标签
                                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                             code({ node, inline, className, children, ...props }: any) {
-                                                return !inline ? (
-                                                    <div className={cn("bg-zinc-950 p-3 rounded-md my-2 overflow-x-auto text-xs text-white", className)}>
-                                                        <code className={className} {...props}>
+                                                // 内联代码
+                                                if (inline) {
+                                                    return (
+                                                        <code className="bg-muted px-1 py-0.5 rounded font-mono text-xs" {...props}>
                                                             {children}
                                                         </code>
-                                                    </div>
-                                                ) : (
-                                                    <code className="bg-muted px-1 py-0.5 rounded font-mono text-xs" {...props}>
+                                                    );
+                                                }
+                                                // 代码块（已经在 pre 标签内）
+                                                return (
+                                                    <code className={className} {...props}>
                                                         {children}
                                                     </code>
-                                                )
+                                                );
                                             }
                                         }}
                                     >

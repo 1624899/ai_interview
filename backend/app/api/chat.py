@@ -65,7 +65,10 @@ async def start_interview(request: InterviewStartRequest):
             await session_service.create_session(
                 session_id=request.thread_id,
                 mode=request.mode,
+                resume_filename=request.resume_filename,
+                resume_content=request.resume_context,
                 job_description=request.job_description,
+                company_info=getattr(request, "company_info", "未知"),
                 max_questions=request.max_questions
             )
         
@@ -186,15 +189,22 @@ async def event_generator(graph, inputs, config, thread_id: str, user_message: s
             
             # 处理 LLM 生成的 token
             if kind == "on_chat_model_stream":
-                content = event["data"]["chunk"].content
-                if content:
-                    ai_response_content += content
-                    # SSE 格式: data: <json>\n\n
-                    response = ChatStreamResponse(
-                        type="token",
-                        content=content
-                    )
-                    yield f"data: {response.model_dump_json()}\n\n"
+                # 获取当前节点名称
+                # 注意：langgraph_node 是 LangGraph 注入的元数据，用于标识当前运行的节点
+                node_name = event.get("metadata", {}).get("langgraph_node", "")
+                
+                # 只流式传输面向用户的节点输出 (interviewer 和 summary)
+                # 过滤掉 planner (生成 JSON 计划) 和 evaluator (评估用户回答) 的内部思考过程
+                if node_name in ["interviewer", "summary"]:
+                    content = event["data"]["chunk"].content
+                    if content:
+                        ai_response_content += content
+                        # SSE 格式: data: <json>\n\n
+                        response = ChatStreamResponse(
+                            type="token",
+                            content=content
+                        )
+                        yield f"data: {response.model_dump_json()}\n\n"
             
             # 处理链结束，获取完整状态
             elif kind == "on_chain_end":

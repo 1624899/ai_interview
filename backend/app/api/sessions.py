@@ -15,7 +15,7 @@ from app.models.session import (
     SessionDetailResponse,
     SessionListItem
 )
-from app.services.session_service import SessionService
+from app.database.session_service import SessionService
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ async def create_session(request: SessionCreateRequest):
 @router.get("/", response_model=SessionListResponse)
 async def list_sessions(
     status: Optional[str] = Query(None, description="筛选状态: active, completed, archived"),
-    mode: Optional[str] = Query(None, description="筛选模式: coach, mock"),
+    mode: Optional[str] = Query(None, description="筛选模式: mock"),
     limit: Optional[int] = Query(50, description="返回数量限制"),
     offset: int = Query(0, description="偏移量")
 ):

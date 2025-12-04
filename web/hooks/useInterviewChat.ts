@@ -18,20 +18,15 @@ export interface ResumeInfo {
     content: string;
 }
 
-// 面试模式类型
-export type InterviewMode = 'mock' | 'coach';
-
 // 面试聊天钩子属性接口
 interface UseInterviewChatProps {
-    initialMode?: InterviewMode;
 }
 
 // API基础URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProps = {}) {
+export function useInterviewChat({ }: UseInterviewChatProps = {}) {
     const [messages, setMessages] = useState<Message[]>([]);
-    const [mode, setMode] = useState<InterviewMode>(initialMode);
     const [resume, setResume] = useState<ResumeInfo | null>(null);
     const [isStreaming, setIsStreaming] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -74,7 +69,7 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
                     resume_context: resume?.content || "",
                     job_description: currentJobDescription || "通用软件工程师",
                     company_info: currentCompanyInfo || "未知",
-                    mode: mode,
+                    mode: 'mock',
                     max_questions: 5
                 }),
                 signal: abortControllerRef.current?.signal
@@ -157,12 +152,11 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
                 return newMessages;
             });
         }
-    }, [resume, mode, threadId, isStreaming]);
+    }, [resume, threadId, isStreaming]);
 
     const startInterview = useCallback(async (
         jobDescription: string,
         currentResume: ResumeInfo | null = resume,
-        currentMode: InterviewMode = mode,
         currentThreadId: string = threadId,
         currentCompanyInfo: string = ""
     ) => {
@@ -181,18 +175,20 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
                     resume_filename: currentResume.filename,
                     job_description: jobDescription,
                     company_info: currentCompanyInfo || "未知",
-                    mode: currentMode,
+                    mode: 'mock',
                     max_questions: 5
                 })
             });
 
             if (!response.ok) throw new Error('启动面试失败');
 
-            // 获取后端生成的标题（如果有返回）
+            // 获取后端生成的标题和第一题
             const data = await response.json();
 
-            // ✅ 修复：初始化后通过发送空消息来触发后端 Planner 生成第一个问题
-            await sendMessage("", currentThreadId, jobDescription, currentCompanyInfo);
+            // 直接显示第一题
+            if (data.first_question) {
+                setMessages([{ role: 'ai', content: data.first_question, isStreaming: false }]);
+            }
 
         } catch (error) {
             console.error('启动面试时出错:', error);
@@ -200,7 +196,7 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
         } finally {
             setIsLoading(false);
         }
-    }, [resume, mode, threadId, sendMessage]);
+    }, [resume, threadId]);
 
     // 暂停流式输出
     const stopStreaming = useCallback(() => {
@@ -237,7 +233,7 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
         } finally {
             setIsLoading(false);
         }
-    }, [mode]);
+    }, []);
 
     const clearMessages = useCallback(() => {
         setMessages([]);
@@ -282,8 +278,6 @@ export function useInterviewChat({ initialMode = 'coach' }: UseInterviewChatProp
 
     return {
         messages,
-        mode,
-        setMode,
         resume,
         isStreaming,
         isLoading,

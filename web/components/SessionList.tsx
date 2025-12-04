@@ -31,7 +31,6 @@ interface SessionListProps {
     onEditSession?: (sessionId: string, newTitle: string) => void;
     onTogglePin?: (sessionId: string, pinned: boolean) => void;
     currentSessionId?: string;
-    mode?: 'coach' | 'mock';
     loading?: boolean;
 }
 
@@ -42,7 +41,6 @@ export function SessionList({
     onEditSession,
     onTogglePin,
     currentSessionId,
-    mode,
     loading
 }: SessionListProps) {
 
@@ -140,9 +138,8 @@ function SessionItem({ session, isActive, onSelect, onDelete, onEdit, onTogglePi
     const [isEditing, setIsEditing] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [editTitle, setEditTitle] = useState(session.title);
-    const isCoach = session.mode === 'coach';
     // 移除可能存在的"职位名称："前缀，保持整洁
-    const displayTitle = (session.title || (isCoach ? "辅导会话" : "模拟面试")).replace('职位名称：', '').replace('职位名称:', '');
+    const displayTitle = (session.title || "模拟面试").replace('职位名称：', '').replace('职位名称:', '');
 
     const handleEdit = (e: React.MouseEvent) => {
         e.stopPropagation();

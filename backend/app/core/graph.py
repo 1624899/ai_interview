@@ -1,19 +1,30 @@
 """
 面试系统 Graph 定义
-实现 Planner-Executor-Evaluator 架构
-支持动态追问、意图识别和智能评估
+实现双层架构：轻量对话 + 后台画像
+支持极速响应和多维度分析
 """
 
+import asyncio
+import json
+import logging
 import operator
+import re
 from typing import Annotated, List, Literal, TypedDict, Optional
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, END
 from . import llms
-from . import prompt as prompt_module
 from .memory import get_async_sqlite_saver
+from .mode_strategy import ModeStrategyFactory
 
-# 全局变量用于跟踪图实例
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# 数据结构定义
+# ============================================================================
+
+
 _graph_instances = []
 
 def register_graph_instance(graph):
@@ -29,11 +40,7 @@ def clear_graph_instances():
     """清空图实例列表"""
     _graph_instances.clear()
 
-llm = llms.get_llm()
-
-# ============================================================================
-# 数据结构定义
-# ============================================================================
+llm = llms.get_smart_llm()
 
 class InterviewQuestion(BaseModel):
     """面试问题数据模型"""
@@ -48,320 +55,268 @@ class PlanOutput(BaseModel):
     questions: List[InterviewQuestion]
 
 
-class EvaluationOutput(BaseModel):
-    """评估输出数据模型"""
-    decision: Literal["ANSWER_PASS", "ANSWER_WEAK", "ASK_CLARIFICATION", "UNKNOWN"] = Field(
-        description="决策结果"
-    )
-    reason: str = Field(description="决策理由或追问方向")
+
 
 
 class InterviewState(TypedDict):
     """
     面试状态定义 - 统一的状态结构
     """
+
     # 消息历史
     messages: Annotated[List[BaseMessage], operator.add]
-    
+
     # 基础信息
     resume_context: str
     job_description: str
     company_info: str  # 公司信息
-    mode: Literal["coach", "mock"]  # 面试模式
-    
+    mode: Literal["mock"]  # 面试模式
+    session_id: str  # 会话ID（用于后台分析）
+
     # 规划相关
     interview_plan: List[dict]  # 存储问题清单
     current_question_index: int
     max_questions: int
-    
-    # 动态控制相关
-    eval_status: Literal["start_new", "follow_up", "clarify", "pass"]
-    eval_reason: str
-    follow_up_count: int  # 限制追问次数
-    clarify_count: int  # 限制澄清/提问次数
-    
+
     # 统计信息
     question_count: int  # 已完成的问题数（不含追问）
+    follow_up_count: int  # 当前主线问题的追问次数
+    
+    # 阶段控制
+    turn_phase: Literal["opening", "feedback"]
+    
+    # 追问控制
+    current_sub_question: Optional[str]
+    max_follow_ups: int
 
 
 # ============================================================================
-# Planner-Executor-Evaluator 节点
+# 节点函数
 # ============================================================================
 
-def node_planner(state: InterviewState):
+async def node_planner(state: InterviewState):
     """
-    规划节点：一次性生成题目清单
+    规划节点：生成面试题目
     """
-    import json
-    import re
+    job_desc = state["job_description"]
+    resume = state["resume_context"]
+    company_info = state.get("company_info", "")
+    max_q = state.get("max_questions", 5)
     
-    # 1. 准备 Prompt
-    sys_prompt = prompt_module.get_planner_prompt(
-        state["resume_context"], 
-        state["job_description"], 
-        state.get("company_info", "未知"),
-        state.get("max_questions", 5)
-    )
+    company_section = f"\n    【公司信息】：\n    {company_info}\n" if company_info else ""
+
+    prompt = f"""你是一位资深技术面试官。请根据以下信息设计 {max_q} 道面试题目。
     
-    # 2. 调用 LLM 生成结构化数据
-    response = llm.invoke(sys_prompt)
-    content = response.content
+    【岗位描述】：
+    {job_desc}
+    {company_section}
+    【候选人简历摘要】：
+    {resume[:2000]}
     
-    # 3. 提取 JSON（处理可能的 markdown 标记）
-    # 尝试提取 ```json ... ``` 中的内容
-    json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
-    if json_match:
-        json_str = json_match.group(1)
-    else:
-        # 如果没有 markdown 标记，直接使用内容
-        json_str = content
+    要求：
+    1. 题目难度适中，覆盖核心技能点。
+    2. 第 1 道为自我介绍题。
+    3. 至少包含 1 道行为面试题（Behavioral Question）。
+    4. 题目描述要清晰具体。
     
-    # 4. 解析 JSON
-    try:
-        questions_data = json.loads(json_str)
-        
-        # 如果返回的是 {"questions": [...]} 格式
-        if isinstance(questions_data, dict) and "questions" in questions_data:
-            questions_list = questions_data["questions"]
-        else:
-            questions_list = questions_data
-        
-        # 转换为 InterviewQuestion 对象
-        questions = [
-            InterviewQuestion(
-                id=q.get("id", i+1),
-                topic=q.get("topic", "未知主题"),
-                content=q.get("content", ""),
-                type=q.get("type", "tech")
-            )
-            for i, q in enumerate(questions_list)
+    请严格按照以下 JSON 结构输出，确保包含所有字段。
+    【重要】：不要包含 markdown 格式（如 ```json ... ```），只输出纯 JSON 字符串。
+    {{
+        "questions": [
+            {{
+                "id": 1,
+                "topic": "考察主题",
+                "content": "具体问题内容",
+                "type": "题目类型(intro/tech/behavior/system_design)"
+            }}
         ]
-        
-    except json.JSONDecodeError as e:
-        # 如果解析失败，使用默认问题
-        print(f"警告: JSON 解析失败: {e}")
-        print(f"原始内容: {content[:200]}...")
-        questions = [
-            InterviewQuestion(
-                id=1,
-                topic="自我介绍",
-                content="请先做一个简单的自我介绍，包括你的工作经验和技术栈。",
-                type="intro"
-            )
-        ]
+    }}
+    """
     
-    # 5. 初始化状态
+    # 禁用流式输出以避免 OpenAI structured output 的 bug
+    structured_llm = llm.with_structured_output(PlanOutput).with_config({"run_name": "planner"})
+    plan = await structured_llm.ainvoke(prompt, config={"callbacks": []})
+    
+    interview_plan = [q.model_dump() for q in plan.questions]
+    
+    # 保存 interview_plan 到数据库
+    session_id = state.get("session_id")
+    if session_id:
+        try:
+            from app.database.session_service import SessionService
+            service = SessionService()
+            await service.save_interview_plan(session_id, interview_plan)
+        except Exception as e:
+            logger.error(f"保存 interview_plan 到数据库失败: {e}")
+    
     return {
-        "interview_plan": [q.dict() for q in questions],
+        "interview_plan": interview_plan,
         "current_question_index": 0,
-        "eval_status": "start_new",  # 初始状态为开始新题
-        "follow_up_count": 0,
-        "clarify_count": 0,  # 初始化澄清计数
         "question_count": 0,
-        "messages": [AIMessage(content="[系统] 面试准备就绪，即将开始。")]
+        "follow_up_count": 0,
+        "turn_phase": "opening",
+        "current_sub_question": None,
+        "max_follow_ups": 2
     }
 
 
-
-def node_interviewer(state: InterviewState):
+async def node_responder(state: InterviewState):
     """
-    执行节点：负责提问、追问或解释
+    回复节点：极速响应模式 (Fast Channel)
     """
-    plan = state["interview_plan"]
-    idx = state["current_question_index"]
-    mode = state.get("mode", "mock")
+    idx = state.get("current_question_index", 0)
+    plan = state.get("interview_plan", [])
+    messages = state.get("messages", [])
+    turn_phase = state.get("turn_phase", "opening")
     
-    # 边界检查 - 如果所有问题都完成了，不再生成新问题
-    if idx >= len(plan):
-        # 返回空更新，让流程继续到 Evaluator，然后路由到 Summary
-        return {}
-
-    current_q = plan[idx]
+    # 使用 Fast LLM 保证速度
+    fast_llm = llms.get_fast_llm()
     
-    # 获取动态 Prompt
-    system_prompt_str = prompt_module.get_dynamic_interviewer_prompt(
-        current_question_content=current_q["content"],
-        eval_status=state["eval_status"],
-        eval_reason=state.get("eval_reason", ""),
-        mode=mode  # 传递模式参数
-    )
-    
-    # 调用 LLM
-    # 为了节省 token，只保留最近的对话历史
-    recent_messages = state["messages"][-10:] if len(state["messages"]) > 10 else state["messages"]
-    messages = [SystemMessage(content=system_prompt_str)] + recent_messages
-    response = llm.invoke(messages)
-    
-    return {"messages": [response]}
-
-
-
-
-def node_evaluator(state: InterviewState):
-    """
-    评估节点：判断用户意图和回答质量
-    """
-    import json
-    import re
-    
-    # 获取用户最新的一条回复
-    user_messages = [msg for msg in state["messages"] if isinstance(msg, HumanMessage)]
-    if not user_messages:
-        # 没有用户消息，直接通过
+    # ==========================================
+    # 1. 开场阶段 (Opening Phase)
+    # ==========================================
+    if turn_phase == "opening":
+        current_question = plan[idx]["content"]
+        
+        prompt = f"""你是一位专业的技术面试官。请直接向候选人提出以下问题。
+        
+        问题：{current_question}
+        """
+        
+        response = await fast_llm.ainvoke([HumanMessage(content=prompt)])
+        
         return {
-            "eval_status": "pass",
-            "eval_reason": "无用户输入"
+            "messages": [response],
+            "turn_phase": "feedback" # 切换到反馈阶段，准备处理用户的下一个回答
+        }
+        
+    # ==========================================
+    # 2. 反馈阶段 (Feedback Phase)
+    # ==========================================
+    # 用户已经回答了上一题
+    
+    # 获取用户回答
+    user_response = messages[-1].content if messages else ""
+    
+    # 准备下一题索引
+    next_idx = idx + 1
+    
+    # 检查是否所有题目都问完了
+    if next_idx >= len(plan):
+        # 所有题目都问完了，直接结束
+        return {
+            "current_question_index": next_idx,
+            "question_count": state.get("question_count", 0) + 1
         }
     
-    last_user_msg = user_messages[-1]
+    current_question = plan[idx]["content"]
+    next_question = plan[next_idx]["content"]
     
-    # 获取当前题目
-    plan = state["interview_plan"]
-    idx = state["current_question_index"]
-    
-    if idx >= len(plan):
-        return {
-            "eval_status": "pass",
-            "eval_reason": "面试已结束"
-        }
-    
-    current_q = plan[idx]
-    
-    # 准备 Prompt
-    prompt_str = prompt_module.get_evaluator_prompt(
-        current_question=current_q["content"],
-        user_response=last_user_msg.content
-    )
-    
-    # 调用 LLM 进行分类
-    response = llm.invoke(prompt_str)
-    content = response.content
-    
-    # 尝试解析 JSON
-    try:
-        # 提取 JSON（处理可能的 markdown 标记）
-        json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            json_str = content
-        
-        eval_data = json.loads(json_str)
-        decision = eval_data.get("decision", "UNKNOWN")
-        reason = eval_data.get("reason", "")
-        
-    except (json.JSONDecodeError, AttributeError):
-        # 如果 JSON 解析失败，使用简单的关键词匹配
-        user_text = last_user_msg.content.lower()
-        
-        # 检查是否是提问
-        question_keywords = ["什么", "为什么", "怎么", "如何", "请问", "能否", "可以", "?", "？"]
-        if any(kw in user_text for kw in question_keywords) and len(user_text) < 50:
-            decision = "ASK_CLARIFICATION"
-            reason = "用户似乎在提问"
-        # 检查是否完全不会
-        elif any(kw in user_text for kw in ["不知道", "不会", "没了解", "不清楚"]):
-            decision = "UNKNOWN"
-            reason = "用户表示不了解"
-        # 检查回答是否太简短
-        elif len(user_text) < 20:
-            decision = "ANSWER_WEAK"
-            reason = "回答过于简短"
-        else:
-            decision = "ANSWER_PASS"
-            reason = "回答基本完整"
-    
-    # 逻辑处理
-    new_status = "pass"
-    current_idx = idx
-    follow_up_cnt = state.get("follow_up_count", 0)
-    clarify_cnt = state.get("clarify_count", 0)
-    question_cnt = state.get("question_count", 0)
-    mode = state.get("mode", "mock")
-    
-    if decision == "ANSWER_PASS":
-        # 回答通过 -> 准备下一题
-        new_status = "start_new"
-        current_idx += 1
-        follow_up_cnt = 0
-        clarify_cnt = 0  # 重置澄清计数
-        question_cnt += 1  # 完成了一个问题
-        
-    elif decision == "ANSWER_WEAK":
-        # 回答较弱 -> 判断是否追问
-        if follow_up_cnt < 2:  # 最多追问2次
-            new_status = "follow_up"
-            follow_up_cnt += 1
-            clarify_cnt = 0  # 重置澄清计数
-        else:
-            # 追问太多了，放过他，下一题
-            new_status = "start_new"
-            current_idx += 1
-            follow_up_cnt = 0
-            clarify_cnt = 0
-            question_cnt += 1
-            
-    elif decision == "ASK_CLARIFICATION":
-        # 用户提问 -> 需要解释
-        if clarify_cnt < 2:  # 最多解释2次
-            new_status = "clarify"
-            clarify_cnt += 1
-            # index 不变，follow_up_count 不变
-        else:
-            # 用户反复提问，强制进入下一题
-            new_status = "start_new"
-            current_idx += 1
-            follow_up_cnt = 0
-            clarify_cnt = 0
-            question_cnt += 1
-            reason = "用户反复提问超过限制，跳过此题"
-        
-    else:  # UNKNOWN - 用户表示不会
-        if mode == "coach":
-            # Coach 模式：给出答案和讲解，然后进入下一题
-            new_status = "start_new"
-            current_idx += 1
-            follow_up_cnt = 0
-            clarify_cnt = 0
-            question_cnt += 1
-            reason = "用户表示不会，Coach 模式将给出答案和讲解"
-        else:
-            # Mock 模式：直接跳过，不给答案
-            new_status = "start_new"
-            current_idx += 1
-            follow_up_cnt = 0
-            clarify_cnt = 0
-            question_cnt += 1
-            reason = "用户表示不会，跳过此题"
+    # ==========================================
+    # 简单回复逻辑（Fast Model）
+    # ==========================================
+    # Prompt: 引导 LLM 生成过渡语和下一题
+    prompt = f"""你是一位专业的技术面试官。
 
+候选人刚回答了以下问题：
+问题：{current_question}
+回答：{user_response[:800]}
+
+请生成一句简短的评价（一句话即可，不要深入点评），然后自然地引出下一道题目。
+
+下一道题目：{next_question}
+
+请直接输出你的回复（不要输出"回复："等前缀）。"""
+    
+    response = await fast_llm.ainvoke([HumanMessage(content=prompt)])
+    
     return {
-        "eval_status": new_status,
-        "eval_reason": reason,
-        "current_question_index": current_idx,
-        "follow_up_count": follow_up_cnt,
-        "clarify_count": clarify_cnt,
-        "question_count": question_cnt
+        "messages": [response],
+        "current_question_index": next_idx,
+        "question_count": state.get("question_count", 0) + 1,
+        "current_sub_question": None,
+        "follow_up_count": 0,
+        "max_questions": state.get("max_questions", 5)
     }
 
 
 
 
 
-def node_summary(state: InterviewState):
+async def _trigger_background_analysis(state):
+    """触发后台画像分析（异步任务）"""
+    try:
+        from app.services.analysis_service import get_analysis_service
+        
+        # 提取必要信息
+        resume = state.get("resume_context", "")
+        job_desc = state.get("job_description", "")
+        company_info = state.get("company_info", "未知")
+        
+        # 构建 QA 历史
+        messages = state.get("messages", [])
+        qa_history = []
+        
+        # 正确解析 messages 列表
+        # 结构：[AI 问题1, User 回答1, AI 问题2, User 回答2, ...]
+        for i in range(0, len(messages) - 1, 2):
+            if i + 1 < len(messages):
+                ai_msg = messages[i]
+                user_msg = messages[i + 1]
+                
+                # 提取内容
+                question = ai_msg.content if hasattr(ai_msg, 'content') else str(ai_msg)
+                answer = user_msg.content if hasattr(user_msg, 'content') else str(user_msg)
+                
+                # 只保留有效的 QA 对
+                if question.strip() and answer.strip():
+                    qa_history.append({
+                        "question": question,
+                        "answer": answer
+                    })
+        
+        # 如果没有 QA 历史，不触发分析
+        if not qa_history:
+            logger.debug("[AnalysisService] QA 历史为空，跳过分析")
+            return
+        
+        # 获取 session_id
+        session_id = state.get("session_id")
+        if not session_id:
+            logger.warning("[AnalysisService] session_id 缺失，跳过分析")
+            return
+        
+        logger.info(f"[AnalysisService] 开始异步分析会话 {session_id}，共 {len(qa_history)} 轮对话")
+        
+        # 调用分析服务
+        service = get_analysis_service()
+        await service.analyze_candidate(session_id, resume, job_desc, company_info, qa_history)
+        
+    except Exception as e:
+        logger.error(f"后台分析触发失败: {str(e)}")
+
+
+async def node_summary(state: InterviewState):
     """
     总结节点：生成面试报告
     """
     mode = state.get("mode", "mock")
     
-    # 根据模式选择不同的总结 Prompt
-    if mode == "coach":
-        system_prompt = prompt_module.get_coach_feedback_prompt()
-    else:
-        system_prompt = prompt_module.get_mock_feedback_prompt()
+    # 使用策略模式获取对应模式的反馈提示词
+    strategy = ModeStrategyFactory.get_strategy(mode)
+    system_prompt = strategy.get_feedback_prompt()
     
     # 调用 LLM 生成总结
+    # 使用 Smart LLM
+    smart_llm = llms.get_smart_llm()
+    
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
-    response = llm.invoke(messages)
+    response = await smart_llm.ainvoke(messages)
+    
+    # ==========================================
+    # 触发后台异步分析（面试结束，生成完整画像）
+    # ==========================================
+    asyncio.create_task(_trigger_background_analysis(state))
     
     return {"messages": [response]}
 
@@ -372,95 +327,78 @@ def node_summary(state: InterviewState):
 
 def route_entry(state: InterviewState):
     """
-    入口路由：判断是否已经有规划
+    入口路由：根据当前状态决定进入哪个节点
     """
-    if state.get("interview_plan"):
-        return "evaluator"
-    return "planner"
-
-
-def route_after_evaluator(state: InterviewState):
-    """
-    Evaluator 之后的路由逻辑
-    """
-    idx = state["current_question_index"]
     plan = state.get("interview_plan", [])
     
-    if idx >= len(plan):
-        return "summary"  # 改为跳转到总结节点
-    
-    return "continue"
+    # 如果没有计划，进入规划
+    if not plan:
+        return "planner"
+            
+    # 其他情况，进入 Responder 处理
+    return "responder"
 
 
-# ============================================================================
-# Graph 构建函数
-# ============================================================================
-
-async def build_interview_graph(mode: str = "coach"):
+def route_after_responder(state: InterviewState):
     """
-    构建 Planner-Executor-Evaluator 架构的面试图谱
+    Responder 之后的路由
+    """
+    idx = state.get("current_question_index", 0)
+    plan = state.get("interview_plan", [])
     
-    Args:
-        mode: 面试模式（coach/mock），保留参数以兼容旧代码
-    
-    Returns:
-        编译后的图谱实例
+    # 检查是否所有题目都问完了
+    if idx >= len(plan):
+        # 所有题目都问完了，去总结
+        return "summary"
+        
+    # 还有题目，等待用户回答
+    return END
+
+
+# ============================================================================
+# 图构建
+# ============================================================================
+
+async def build_interview_graph(mode: str = "mock"):
+    """
+    构建面试图谱
     """
     workflow = StateGraph(InterviewState)
-    checkpointer = await get_async_sqlite_saver()
-
+    
     # 添加节点
     workflow.add_node("planner", node_planner)
-    workflow.add_node("interviewer", node_interviewer)
-    workflow.add_node("evaluator", node_evaluator)
-    workflow.add_node("summary", node_summary)  # 新增总结节点
+    workflow.add_node("responder", node_responder)
+    workflow.add_node("summary", node_summary)
     
-    # 流程编排
-    # 1. 条件入口：如果有 plan 了，直接去 Evaluator；否则去 Planner
+    # 设置入口
     workflow.set_conditional_entry_point(
         route_entry,
         {
             "planner": "planner",
-            "evaluator": "evaluator"
+            "responder": "responder"
         }
     )
     
-    # 2. Planner -> Interviewer (提出第一个问题)
-    workflow.add_edge("planner", "interviewer")
+    # Planner -> Responder
+    workflow.add_edge("planner", "responder")
     
-    # 3. Interviewer -> END (发送给用户，等待用户回复)
-    workflow.add_edge("interviewer", END)
-    
-    # 4. Evaluator -> Interviewer 或 Summary (根据评估结果决定)
+    # Responder -> Human (or Summary)
     workflow.add_conditional_edges(
-        "evaluator",
-        route_after_evaluator,
+        "responder",
+        route_after_responder,
         {
-            "continue": "interviewer",
-            "summary": "summary"  # 所有问题完成后，跳转到总结
+            END: END,
+            "summary": "summary"
         }
     )
+
     
-    # 5. Summary -> END (生成报告后结束)
+    # Summary -> END
     workflow.add_edge("summary", END)
     
+    # 注册图实例
+    checkpointer = await get_async_sqlite_saver()
     graph = workflow.compile(checkpointer=checkpointer)
-    return register_graph_instance(graph)
-
-
-# ============================================================================
-# 向后兼容的构建函数
-# ============================================================================
-
-async def build_mock_interview_graph():
-    """
-    构建模拟面试图谱（向后兼容）
-    """
-    return await build_interview_graph(mode="mock")
-
-
-async def build_coach_interview_graph():
-    """
-    构建辅导模式图谱（向后兼容）
-    """
-    return await build_interview_graph(mode="coach")
+    register_graph_instance(graph)
+    
+    return graph

@@ -25,22 +25,46 @@ class DatabaseManager:
             db_path: 数据库文件路径，默认使用配置的路径
         """
         self.db_path = db_path or DB_PATH
+        self._conn = None
     
+    async def connect(self):
+        """建立持久化数据库连接"""
+        if not self._conn:
+            self._conn = await aiosqlite.connect(self.db_path)
+            self._conn.row_factory = aiosqlite.Row
+            # 开启 WAL 模式以提高并发性能
+            await self._conn.execute("PRAGMA journal_mode=WAL;")
+            await self._conn.commit()
+            logger.info(f"数据库连接已建立 (WAL模式): {self.db_path}")
+
+    async def disconnect(self):
+        """关闭持久化数据库连接"""
+        if self._conn:
+            await self._conn.close()
+            self._conn = None
+            logger.info("数据库连接已关闭")
+
     @asynccontextmanager
     async def get_connection(self):
         """
         获取异步数据库连接（上下文管理器）
+        如果已建立持久连接，则复用；否则创建临时连接。
         
         Usage:
             async with db_manager.get_connection() as conn:
                 cursor = await conn.execute("SELECT * FROM table")
         """
-        conn = await aiosqlite.connect(self.db_path)
-        conn.row_factory = aiosqlite.Row
-        try:
-            yield conn
-        finally:
-            await conn.close()
+        if self._conn:
+            # 复用持久连接
+            yield self._conn
+        else:
+            # 创建临时连接（用于脚本或未初始化的情况）
+            conn = await aiosqlite.connect(self.db_path)
+            conn.row_factory = aiosqlite.Row
+            try:
+                yield conn
+            finally:
+                await conn.close()
     
     async def execute_query(
         self,

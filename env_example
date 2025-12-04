@@ -13,3 +13,19 @@ UPLOAD_DIR=data/resumes
 MAX_FILE_SIZE_MB=10
 ALLOWED_FILE_EXTENSIONS=pdf,docx,txt
 MAX_RESUME_COUNT=5
+
+# ============================================================================
+# LLM 双通道配置（分级模型支持）
+# ============================================================================
+
+# Fast Channel (Fast & Cheap) - 用于意图识别、简单分类
+# 设置 temperature=0 以保证确定性输出
+FAST_LLM_API_KEY=your_fast_llm_api_key
+FAST_LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+FAST_LLM_MODEL=glm-4-flash
+
+# Smart Channel (High Intelligence) - 用于生成复杂的面试官回复、点评和总结
+# 设置 temperature=0.7 以允许一定的创造性
+SMART_LLM_API_KEY=your_smart_llm_api_key
+SMART_LLM_BASE_URL=https://apis.iflow.cn/v1
+SMART_LLM_MODEL=qwen3-235b-a22b-instruct

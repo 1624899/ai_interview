@@ -13,7 +13,7 @@ from langchain_core.messages import HumanMessage
 
 from app.core.graph import build_interview_graph
 from app.models.schemas import ChatRequest, ChatStreamResponse, InterviewStartRequest, ErrorResponse, RollbackRequest
-from app.services.session_service import SessionService
+from app.database.session_service import SessionService
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -49,13 +49,10 @@ async def start_interview(request: InterviewStartRequest):
             "job_description": request.job_description,
             "company_info": getattr(request, "company_info", "未知"),
             "mode": request.mode,
+            "session_id": request.thread_id,  # 添加 session_id
             "interview_plan": [],  # 将由 planner 节点填充
             "current_question_index": 0,
             "max_questions": request.max_questions,
-            "eval_status": "start_new",
-            "eval_reason": "",
-            "follow_up_count": 0,
-            "clarify_count": 0,
             "question_count": 0
         }
         
@@ -81,6 +78,28 @@ async def start_interview(request: InterviewStartRequest):
         # 更新数据库中的会话标题
         await session_service.update_session(request.thread_id, title=title)
 
+        # 执行图以生成第一题
+        first_question = ""
+        async for event in graph.astream_events(inputs, config=config, version="v1"):
+            kind = event["event"]
+            
+            # 收集 responder 节点的输出
+            if kind == "on_chat_model_stream":
+                node_name = event.get("metadata", {}).get("langgraph_node", "")
+                if node_name == "responder":
+                    content = event["data"]["chunk"].content
+                    if content:
+                        first_question += content
+        
+        # 保存第一题到会话
+        if first_question:
+            await session_service.add_message(
+                session_id=request.thread_id,
+                role="ai",
+                content=first_question,
+                question_index=0
+            )
+
         # 返回会话信息
         return {
             "success": True,
@@ -88,16 +107,17 @@ async def start_interview(request: InterviewStartRequest):
             "thread_id": request.thread_id,
             "mode": request.mode,
             "max_questions": request.max_questions,
-            "session_title": title
+            "session_title": title,
+            "first_question": first_question  # 返回第一题
         }
         
     except Exception as e:
-        logger.error(f"开始面试会话失败: {str(e)}")
+        logger.error(f"开始面试会话失败: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "InternalServerError",
-                "message": "开始面试会话失败"
+                "message": f"开始面试会话失败: {str(e)}"
             }
         )
 
@@ -121,21 +141,37 @@ async def stream_chat(request: ChatRequest):
         # 配置线程 ID
         config = {"configurable": {"thread_id": request.thread_id}}
         
-        # 构建输入状态（新架构）
+        # 校验消息非空
+        if not request.message or not request.message.strip():
+            raise HTTPException(status_code=400, detail="Message cannot be empty")
+            
+        # 1. 获取会话完整信息（用于状态注水）
+        # 即使 Checkpoint 丢失，也能通过数据库恢复上下文
+        session = await session_service.get_session(request.thread_id)
+        interview_plan = await session_service.get_interview_plan(request.thread_id)
+        
+        # 2. 构建输入状态（新架构 - 状态注水模式）
+        # 总是传入最新的上下文信息，确保 Graph 状态与数据库一致
         inputs = {
             "messages": [HumanMessage(content=request.message)],
             "resume_context": request.resume_context,
             "job_description": request.job_description,
             "company_info": getattr(request, "company_info", "未知"),
             "mode": request.mode,
-            "interview_plan": [],  # 会从 checkpoint 恢复
-            "current_question_index": 0,  # 会从 checkpoint 恢复
+            "session_id": request.thread_id,
             "max_questions": request.max_questions,
-            "eval_status": "start_new",
-            "eval_reason": "",
-            "follow_up_count": 0,
-            "clarify_count": 0,
-            "question_count": 0  # 这个值会从数据库中恢复
+            
+            # 🔥 状态注水：从数据库恢复关键状态
+            # 如果 Checkpoint 被清除（例如回退后），这些字段将帮助 Graph 恢复记忆
+            "interview_plan": interview_plan if interview_plan else [],
+            
+            # 动态计算进度：基于最后一条消息的 question_index
+            "question_count": session.messages[-1].question_index if session and session.messages else 0,
+            "current_question_index": session.messages[-1].question_index if session and session.messages else 0,
+            
+            # 因为 stream 接口总是处理用户的回答，所以必须进入 feedback 阶段
+            # 否则默认为 opening 会导致系统重复当前问题而不是推进到下一题
+            "turn_phase": "feedback",
         }
         
         return StreamingResponse(
@@ -175,13 +211,15 @@ async def event_generator(graph, inputs, config, thread_id: str, user_message: s
         str: SSE 格式的事件数据
     """
     ai_response_content = ""
+    final_question_index = inputs.get("current_question_index", 0)
     
     try:
         # 保存用户消息到会话
         await session_service.add_message(
             session_id=thread_id,
             role="user",
-            content=user_message
+            content=user_message,
+            question_index=inputs.get("current_question_index", 0)
         )
         
         async for event in graph.astream_events(inputs, config=config, version="v1"):
@@ -190,12 +228,11 @@ async def event_generator(graph, inputs, config, thread_id: str, user_message: s
             # 处理 LLM 生成的 token
             if kind == "on_chat_model_stream":
                 # 获取当前节点名称
-                # 注意：langgraph_node 是 LangGraph 注入的元数据，用于标识当前运行的节点
                 node_name = event.get("metadata", {}).get("langgraph_node", "")
                 
-                # 只流式传输面向用户的节点输出 (interviewer 和 summary)
+                # 只流式传输面向用户的节点输出 (responder 和 summary)
                 # 过滤掉 planner (生成 JSON 计划) 和 evaluator (评估用户回答) 的内部思考过程
-                if node_name in ["interviewer", "summary"]:
+                if node_name in ["responder", "summary"]:
                     content = event["data"]["chunk"].content
                     if content:
                         ai_response_content += content
@@ -210,6 +247,9 @@ async def event_generator(graph, inputs, config, thread_id: str, user_message: s
             elif kind == "on_chain_end":
                 output = event["data"].get("output")
                 if output and isinstance(output, dict):
+                    if "current_question_index" in output:
+                        final_question_index = output["current_question_index"]
+                    
                     # 可以在这里发送状态更新事件
                     if "question_count" in output:
                         # 更新会话元数据
@@ -234,7 +274,8 @@ async def event_generator(graph, inputs, config, thread_id: str, user_message: s
             await session_service.add_message(
                 session_id=thread_id,
                 role="ai",
-                content=ai_response_content
+                content=ai_response_content,
+                question_index=final_question_index
             )
         
         # 发送结束信号
@@ -347,5 +388,44 @@ async def rollback_chat(request: RollbackRequest):
             detail={
                 "error": "InternalServerError",
                 "message": "回退会话失败"
+            }
+        )
+
+
+@router.get("/profile/{thread_id}")
+async def get_candidate_profile(thread_id: str):
+    """
+    获取候选人能力画像
+    
+    Args:
+        thread_id: 线程 ID
+        
+    Returns:
+        dict: 候选人能力画像
+    """
+    try:
+        from app.services.analysis_service import get_analysis_service
+        
+        service = get_analysis_service()
+        profile = service.get_cached_profile(thread_id)
+        
+        if profile is None:
+            return {
+                "success": False,
+                "message": "画像分析尚未完成或会话不存在"
+            }
+        
+        return {
+            "success": True,
+            "profile": profile.model_dump()
+        }
+        
+    except Exception as e:
+        logger.error(f"获取候选人画像失败: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "InternalServerError",
+                "message": "获取候选人画像失败"
             }
         )

@@ -32,11 +32,15 @@ def init_database():
                 updated_at TEXT NOT NULL,
                 mode TEXT NOT NULL,
                 resume_filename TEXT,
+                resume_content TEXT,
                 job_description TEXT,
+                company_info TEXT,
+                interview_plan TEXT,
                 question_count INTEGER DEFAULT 0,
                 max_questions INTEGER DEFAULT 5,
                 status TEXT DEFAULT 'active',
-                pinned INTEGER DEFAULT 0
+                pinned INTEGER DEFAULT 0,
+                candidate_profile TEXT
             )
         ''')
         logger.info("✓ sessions 表已创建/验证")
@@ -48,11 +52,13 @@ def init_database():
                 session_id TEXT NOT NULL,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
+                question_index INTEGER DEFAULT 0,
                 timestamp TEXT NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
             )
         ''')
         logger.info("✓ messages 表已创建/验证")
+        
         
         # ====================================================================
         # 索引创建

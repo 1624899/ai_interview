@@ -12,8 +12,6 @@ interface SessionSidebarProps {
     onSessionSelect: (sessionId: string) => void;
     onNewSession: () => void;
     currentSessionId?: string;
-    mode?: 'coach' | 'mock';
-    onModeChange: (mode: 'coach' | 'mock') => void;
     sessions: SessionListItem[];
     onDeleteSession: (sessionId: string) => void;
     onEditSession?: (sessionId: string, newTitle: string) => void;
@@ -27,8 +25,6 @@ export function SessionSidebar({
     onSessionSelect,
     onNewSession,
     currentSessionId,
-    mode,
-    onModeChange,
     sessions,
     onDeleteSession,
     onEditSession,
@@ -82,36 +78,6 @@ export function SessionSidebar({
                         </Button>
                     </div>
 
-                    {/* 模式切换按钮 */}
-                    <div className="px-4 pb-2">
-                        <div className="flex p-1 bg-gray-200/50 rounded-xl">
-                            <button
-                                onClick={() => onModeChange('coach')}
-                                className={cn(
-                                    "flex-1 flex items-center justify-center gap-2 py-1.5 text-sm font-medium rounded-lg transition-all duration-200",
-                                    mode === 'coach'
-                                        ? "bg-white text-teal-700 shadow-sm ring-1 ring-black/5"
-                                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
-                                )}
-                            >
-                                <GraduationCap className={cn("w-4 h-4", mode === 'coach' ? "text-teal-600" : "text-gray-400")} />
-                                辅导
-                            </button>
-                            <button
-                                onClick={() => onModeChange('mock')}
-                                className={cn(
-                                    "flex-1 flex items-center justify-center gap-2 py-1.5 text-sm font-medium rounded-lg transition-all duration-200",
-                                    mode === 'mock'
-                                        ? "bg-white text-emerald-700 shadow-sm ring-1 ring-black/5"
-                                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
-                                )}
-                            >
-                                <Timer className={cn("w-4 h-4", mode === 'mock' ? "text-emerald-600" : "text-gray-400")} />
-                                模拟
-                            </button>
-                        </div>
-                    </div>
-
                     {/* 会话列表区域 */}
                     <div className="flex-1 overflow-hidden px-4 py-2">
                         <SessionList
@@ -121,7 +87,6 @@ export function SessionSidebar({
                             onEditSession={onEditSession}
                             onTogglePin={onTogglePin}
                             currentSessionId={currentSessionId}
-                            mode={mode}
                             loading={loading}
                         />
                     </div>

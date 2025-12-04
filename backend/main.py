@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 
 from app.api import chat, upload, sessions
 from app.models.schemas import ErrorResponse
+from app.database import db_manager
 
 # 配置日志
 logging.basicConfig(
@@ -23,9 +24,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-# 全局变量用于存储需要清理的资源
-sqlite_connections = []
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -46,6 +44,9 @@ async def lifespan(app: FastAPI):
     
     logger.info("数据目录初始化完成")
     
+    # 建立数据库持久连接
+    await db_manager.connect()
+    
     yield
     
     # 关闭时执行
@@ -56,59 +57,32 @@ async def lifespan(app: FastAPI):
 
 async def cleanup_resources():
     """
-    清理所有资源，包括数据库连接和图实例
+    清理所有资源，including数据库连接和图实例
     """
-    global sqlite_connections
-    
     logger.info("正在清理资源...")
     
-    # 清理图实例
+    # 关闭全局 checkpointer 和连接
     try:
-        from app.core.graph import get_graph_instances, clear_graph_instances
-        graph_instances = get_graph_instances()
-        
-        for graph in graph_instances:
-            try:
-                if hasattr(graph, 'checkpointer') and hasattr(graph.checkpointer, 'conn'):
-                    await graph.checkpointer.conn.close()
-                    logger.info("已关闭图实例的数据库连接")
-            except Exception as e:
-                logger.error(f"关闭图实例数据库连接时出错: {e}")
-        
-        # 清空图实例列表
+        from app.core.memory import close_checkpointer
+        await close_checkpointer()
+        logger.info("✓ Checkpointer 已关闭")
+    except Exception as e:
+        logger.error(f"✗ 关闭 checkpointer 时出错: {e}")
+    
+    # 清理图实例列表
+    try:
+        from app.core.graph import clear_graph_instances
         clear_graph_instances()
-        
+        logger.info("✓ 图实例列表已清空")
     except Exception as e:
-        logger.error(f"获取或清理图实例时出错: {e}")
+        logger.error(f"✗ 清理图实例时出错: {e}")
     
-    # 清理被跟踪的 SQLite 连接
+    # 关闭数据库持久连接
     try:
-        from app.core.memory import get_tracked_connections, clear_tracked_connections
-        tracked_connections = get_tracked_connections()
-        
-        for conn in tracked_connections:
-            try:
-                await conn.close()
-                logger.info("已关闭被跟踪的 SQLite 连接")
-            except Exception as e:
-                logger.error(f"关闭被跟踪的 SQLite 连接时出错: {e}")
-        
-        # 清空被跟踪的连接列表
-        clear_tracked_connections()
-        
+        await db_manager.disconnect()
+        logger.info("✓ 数据库连接已关闭")
     except Exception as e:
-        logger.error(f"获取或清理被跟踪的连接时出错: {e}")
-    
-    # 清理直接的 SQLite 连接
-    for conn in sqlite_connections:
-        try:
-            await conn.close()
-            logger.info("已关闭 SQLite 连接")
-        except Exception as e:
-            logger.error(f"关闭 SQLite 连接时出错: {e}")
-    
-    # 清空列表
-    sqlite_connections.clear()
+        logger.error(f"✗ 关闭数据库连接时出错: {e}")
     
     logger.info("资源清理完成")
 
@@ -119,7 +93,6 @@ def handle_signal(signum, frame):
     logger.info(f"接收到信号 {signum}，开始优雅关闭...")
     
     # 使用线程池来执行异步清理
-    import concurrent.futures
     import threading
     
     def run_cleanup():

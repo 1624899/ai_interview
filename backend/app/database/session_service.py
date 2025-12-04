@@ -608,3 +608,96 @@ class SessionService:
                         logger.error(f"解析面试题目清单失败: {session_id}")
                         return None
                 return None
+    async def get_recent_profiles(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        获取最近的有画像的会话画像列表（异步）
+        
+        Args:
+            limit: 数量限制
+            
+        Returns:
+            List[Dict[str, Any]]: 画像列表
+        """
+        import json
+        async with db_manager.get_connection() as db:
+            async with db.execute('''
+                SELECT candidate_profile 
+                FROM sessions 
+                WHERE candidate_profile IS NOT NULL 
+                ORDER BY updated_at DESC 
+                LIMIT ?
+            ''', (limit,)) as cursor:
+                rows = await cursor.fetchall()
+                
+                profiles = []
+                for row in rows:
+                    if row[0]:
+                        try:
+                            profiles.append(json.loads(row[0]))
+                        except json.JSONDecodeError:
+                            continue
+                return profiles
+
+    async def save_user_profile(self, profile_data: Dict[str, Any], user_id: str = "default_user") -> bool:
+        """
+        保存用户综合能力画像（异步）
+        
+        Args:
+            profile_data: 画像数据（字典）
+            user_id: 用户ID（默认为 default_user）
+            
+        Returns:
+            bool: 是否成功
+        """
+        import json
+        async with db_manager.get_connection() as db:
+            try:
+                profile_json = json.dumps(profile_data, ensure_ascii=False)
+                now = datetime.now().isoformat()
+                
+                # 使用 UPSERT 语法（INSERT OR REPLACE）
+                await db.execute('''
+                    INSERT INTO user_profile (user_id, profile_data, created_at, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        profile_data = excluded.profile_data,
+                        updated_at = excluded.updated_at
+                ''', (user_id, profile_json, now, now))
+                
+                await db.commit()
+                logger.info(f"保存用户综合能力画像: {user_id}")
+                return True
+                
+            except Exception as e:
+                logger.error(f"保存用户综合能力画像失败: {e}")
+                return False
+
+    async def get_user_profile(self, user_id: str = "default_user") -> Optional[Dict[str, Any]]:
+        """
+        获取用户综合能力画像（异步）
+        
+        Args:
+            user_id: 用户ID（默认为 default_user）
+            
+        Returns:
+            Optional[Dict[str, Any]]: 画像数据，包含 profile 和 updated_at
+        """
+        import json
+        async with db_manager.get_connection() as db:
+            async with db.execute('''
+                SELECT profile_data, updated_at 
+                FROM user_profile 
+                WHERE user_id = ?
+            ''', (user_id,)) as cursor:
+                row = await cursor.fetchone()
+                
+                if row and row[0]:
+                    try:
+                        return {
+                            "profile": json.loads(row[0]),
+                            "updated_at": row[1]
+                        }
+                    except json.JSONDecodeError:
+                        logger.error(f"解析用户综合能力画像失败: {user_id}")
+                        return None
+                return None

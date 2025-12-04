@@ -130,9 +130,9 @@ class CandidateAnalysisService:
         if context.previous_profile:
             previous_hint = f"""
 【上一轮分析结果】：
-- 技术深度: {context.previous_profile.technical_depth.score}/10
-- 知识广度: {context.previous_profile.technical_breadth.score}/10
-- 沟通能力: {context.previous_profile.communication.score}/10
+- 专业能力: {context.previous_profile.professional_competence.score}/10
+- 逻辑与问题解决: {context.previous_profile.logic_problem_solving.score}/10
+- 沟通表达力: {context.previous_profile.communication.score}/10
 请在此基础上进行增量更新。
 """
         
@@ -153,64 +153,68 @@ class CandidateAnalysisService:
 {previous_hint}
 
 【分析要求】：
-请从以下维度对候选人进行评分和分析：
+请从以下 6 个维度对候选人进行评分和分析：
 
-1. **技术深度 (technical_depth)**：
-   - 对核心技术的理解是否深入？能否讲清楚底层原理？
+1. **专业能力 (professional_competence)**：
+   - 核心技术栈掌握程度，底层原理理解。
    - 评分 0-10，需提供证据。
 
-2. **知识广度 (technical_breadth)**：
-   - 技术栈是否全面？是否了解相关领域的最佳实践？
+2. **执行与结果导向 (execution_results)**：
+   - 是否有明确的目标感？能否克服困难拿到结果？
    - 评分 0-10，需提供证据。
 
-3. **沟通表达能力 (communication)**：
-   - 回答是否清晰、有条理？能否准确理解问题？
+3. **逻辑与问题解决 (logic_problem_solving)**：
+   - 面对复杂问题的拆解能力，逻辑思维是否严密。
    - 评分 0-10，需提供证据。
 
-4. **问题解决思路 (problem_solving)**：
-   - 面对问题时的思考方式？是否有系统性的解决方案？
+4. **沟通表达力 (communication)**：
+   - 表达是否清晰、准确、有条理。
    - 评分 0-10，需提供证据。
 
-5. **简历真实性 (resume_authenticity)**：
-   - 回答是否与简历描述一致？是否存在夸大或虚假成分？
-   - 评分 0-10（10分表示完全真实匹配），需提供证据。
+5. **成长潜力 (growth_potential)**：
+   - 学习能力，对新技术的敏感度，反思复盘习惯。
+   - 评分 0-10，需提供证据。
+
+6. **协作能力 (collaboration)**：
+   - 团队合作意识，换位思考能力。
+   - 评分 0-10，需提供证据。
+
+此外，请提取用户的**技能标签 (skill_tags)**（如：Java, Spring Boot, MySQL, 分布式系统等）。
 
 【输出格式】：
 请**直接输出纯 JSON 格式**，不要用 markdown 代码块包裹。JSON 结构如下：
 
 {{
-  "technical_depth": {{
+  "professional_competence": {{
     "score": 7.5,
-    "evidence": "候选人能够解释清楚XXX的底层原理..."
+    "evidence": "..."
   }},
-  "technical_breadth": {{
+  "execution_results": {{
     "score": 8.0,
-    "evidence": "候选人涉猎广泛，提到了XXX、YYY等技术..."
+    "evidence": "..."
+  }},
+  "logic_problem_solving": {{
+    "score": 7.0,
+    "evidence": "..."
   }},
   "communication": {{
     "score": 6.5,
-    "evidence": "回答较为清晰，但有时表述不够简洁..."
+    "evidence": "..."
   }},
-  "problem_solving": {{
-    "score": 7.0,
-    "evidence": "能够提出系统性的解决方案，但..."
-  }},
-  "resume_authenticity": {{
+  "growth_potential": {{
     "score": 8.5,
-    "evidence": "回答与简历描述基本一致..."
+    "evidence": "..."
   }},
-  "key_strengths": [
-    "技术栈全面，覆盖XXX",
-    "有实际项目经验",
-    "学习能力强"
-  ],
-  "key_weaknesses": [
-    "某些底层原理理解不够深入",
-    "表达可以更简洁"
-  ],
+  "collaboration": {{
+    "score": 7.5,
+    "evidence": "..."
+  }},
+  "skill_tags": ["Java", "Spring Boot", "System Design"],
+  "overall_assessment": "候选人整体表现...",
+  "key_strengths": ["...", "..."],
+  "key_weaknesses": ["...", "..."],
   "recommendation": "maybe",
   "confidence": 0.75,
-  "summary": "候选人整体表现中等偏上...",
   "last_updated": "{datetime.now().isoformat()}"
 }}
 
@@ -221,11 +225,13 @@ class CandidateAnalysisService:
     def _get_default_profile(self) -> CandidateProfile:
         """返回默认画像（分析失败时使用）"""
         return CandidateProfile(
-            technical_depth=DimensionScore(score=5.0, evidence="分析中..."),
-            technical_breadth=DimensionScore(score=5.0, evidence="分析中..."),
+            professional_competence=DimensionScore(score=5.0, evidence="分析中..."),
+            execution_results=DimensionScore(score=5.0, evidence="分析中..."),
+            logic_problem_solving=DimensionScore(score=5.0, evidence="分析中..."),
             communication=DimensionScore(score=5.0, evidence="分析中..."),
-            problem_solving=DimensionScore(score=5.0, evidence="分析中..."),
-            resume_authenticity=DimensionScore(score=5.0, evidence="分析中..."),
+            growth_potential=DimensionScore(score=5.0, evidence="分析中..."),
+            collaboration=DimensionScore(score=5.0, evidence="分析中..."),
+            skill_tags=[],
             last_updated=datetime.now().isoformat()
         )
     

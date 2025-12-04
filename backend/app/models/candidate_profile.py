@@ -17,12 +17,16 @@ class DimensionScore(BaseModel):
 class CandidateProfile(BaseModel):
     """候选人综合能力画像"""
     
-    # 核心维度评分
-    technical_depth: DimensionScore = Field(description="技术深度")
-    technical_breadth: DimensionScore = Field(description="知识广度")
-    communication: DimensionScore = Field(description="沟通表达能力")
-    problem_solving: DimensionScore = Field(description="问题解决思路")
-    resume_authenticity: DimensionScore = Field(description="简历真实性/匹配度")
+    # 核心维度评分 (6维)
+    professional_competence: DimensionScore = Field(description="专业能力")
+    execution_results: DimensionScore = Field(description="执行与结果导向")
+    logic_problem_solving: DimensionScore = Field(description="逻辑与问题解决")
+    communication: DimensionScore = Field(description="沟通表达力")
+    growth_potential: DimensionScore = Field(description="成长潜力")
+    collaboration: DimensionScore = Field(description="协作能力")
+    
+    # 技能标签
+    skill_tags: List[str] = Field(default_factory=list, description="技能标签列表")
     
     # 元信息
     total_questions_analyzed: int = Field(default=0, description="已分析的问题数")

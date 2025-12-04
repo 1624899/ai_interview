@@ -153,6 +153,73 @@ def get_smart_llm():
     """获取Smart Channel LLM实例"""
     return _llm_factory.get_smart_llm()
 
+
+# ============================================================================
+# 动态 LLM 创建（支持用户自定义配置）
+# ============================================================================
+
+def create_llm_from_config(
+    api_key: str,
+    base_url: str,
+    model: str,
+    temperature: float = 0.7,
+    max_tokens: int = 8000
+) -> ChatOpenAI:
+    """
+    根据用户提供的配置创建 LLM 实例
+    
+    Args:
+        api_key: API Key
+        base_url: API Base URL
+        model: 模型名称
+        temperature: 温度参数
+        max_tokens: 最大 token 数
+        
+    Returns:
+        ChatOpenAI: LLM 实例
+    """
+    return ChatOpenAI(
+        temperature=temperature,
+        max_tokens=max_tokens,
+        model_name=model,
+        api_key=api_key,
+        base_url=base_url
+    )
+
+
+def get_llm_for_request(api_config: Optional[dict] = None, channel: str = "smart") -> ChatOpenAI:
+    """
+    获取用于处理请求的 LLM 实例
+    
+    优先使用用户配置，如果没有则使用服务器默认配置
+    支持双通道：smart_model 用于复杂任务，fast_model 用于快速响应
+    
+    Args:
+        api_config: 用户的 API 配置，包含 api_key, base_url, smart_model, fast_model
+        channel: 使用的通道，"fast" 或 "smart"
+        
+    Returns:
+        ChatOpenAI: LLM 实例
+    """
+    # 如果用户提供了配置，使用用户配置
+    if api_config and api_config.get("api_key"):
+        # 根据 channel 选择对应的模型
+        model = api_config.get("smart_model") if channel == "smart" else api_config.get("fast_model")
+        print(f"📱 使用用户自定义 API 配置 ({channel}): {model}")
+        return create_llm_from_config(
+            api_key=api_config["api_key"],
+            base_url=api_config["base_url"],
+            model=model
+        )
+    
+    # 否则使用服务器默认配置
+    print(f"🖥️ 使用服务器默认 API 配置 ({channel} channel)")
+    if channel == "fast":
+        return get_fast_llm()
+    else:
+        return get_smart_llm()
+
+
 # ============================================================================
 # 测试代码
 # ============================================================================

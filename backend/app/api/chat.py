@@ -43,6 +43,16 @@ async def start_interview(request: InterviewStartRequest):
         config = {"configurable": {"thread_id": request.thread_id}}
         
         # 构建初始状态（新架构）
+        # 解析用户的 API 配置
+        api_config = None
+        if request.api_config:
+            api_config = {
+                "api_key": request.api_config.api_key,
+                "base_url": request.api_config.base_url,
+                "smart_model": request.api_config.smart_model,
+                "fast_model": request.api_config.fast_model
+            }
+        
         inputs = {
             "messages": [],
             "resume_context": request.resume_context,
@@ -53,7 +63,8 @@ async def start_interview(request: InterviewStartRequest):
             "interview_plan": [],  # 将由 planner 节点填充
             "current_question_index": 0,
             "max_questions": request.max_questions,
-            "question_count": 0
+            "question_count": 0,
+            "api_config": api_config  # 添加用户 API 配置
         }
         
         # 检查会话是否已存在，如果不存在则创建
@@ -152,6 +163,17 @@ async def stream_chat(request: ChatRequest):
         
         # 2. 构建输入状态（新架构 - 状态注水模式）
         # 总是传入最新的上下文信息，确保 Graph 状态与数据库一致
+        
+        # 解析用户的 API 配置
+        api_config = None
+        if request.api_config:
+            api_config = {
+                "api_key": request.api_config.api_key,
+                "base_url": request.api_config.base_url,
+                "smart_model": request.api_config.smart_model,
+                "fast_model": request.api_config.fast_model
+            }
+        
         inputs = {
             "messages": [HumanMessage(content=request.message)],
             "resume_context": request.resume_context,
@@ -172,6 +194,9 @@ async def stream_chat(request: ChatRequest):
             # 因为 stream 接口总是处理用户的回答，所以必须进入 feedback 阶段
             # 否则默认为 opening 会导致系统重复当前问题而不是推进到下一题
             "turn_phase": "feedback",
+            
+            # 添加用户 API 配置
+            "api_config": api_config
         }
         
         return StreamingResponse(
@@ -392,40 +417,95 @@ async def rollback_chat(request: RollbackRequest):
         )
 
 
-@router.get("/profile/{thread_id}")
-async def get_candidate_profile(thread_id: str):
+@router.post("/profile/generate")
+async def generate_profile():
     """
-    获取候选人能力画像
+    手动触发：生成用户综合能力画像
     
-    Args:
-        thread_id: 线程 ID
-        
+    基于最近 5 次面试，使用时间加权聚合算法生成综合画像
+    
     Returns:
-        dict: 候选人能力画像
+        dict: 生成结果
     """
     try:
-        from app.services.analysis_service import get_analysis_service
+        from app.services.ability_service import get_ability_service
         
-        service = get_analysis_service()
-        profile = service.get_cached_profile(thread_id)
+        service = get_ability_service()
+        # 注意：现在返回的是字典 {"profile": CandidateProfile, "warning": str}
+        result = await service.generate_overall_profile()
         
-        if profile is None:
+        profile = result["profile"]
+        warning = result.get("warning")
+        
+        # 检查是否是空画像（无数据）
+        if profile.overall_assessment == "暂无面试记录，请先进行模拟面试。":
             return {
                 "success": False,
-                "message": "画像分析尚未完成或会话不存在"
+                "message": "暂无面试记录，无法生成画像。请先完成至少一次模拟面试。"
             }
         
-        return {
+        response = {
             "success": True,
+            "message": "综合能力画像已生成",
             "profile": profile.model_dump()
         }
         
+        if warning:
+            response["warning"] = warning
+            
+        return response
+        
+    except ValueError as e:
+        # 处理冷却时间等业务逻辑错误
+        return {
+            "success": False,
+            "message": str(e)
+        }
     except Exception as e:
-        logger.error(f"获取候选人画像失败: {str(e)}")
+        logger.error(f"生成综合能力画像失败: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "InternalServerError",
-                "message": "获取候选人画像失败"
+                "message": f"生成综合能力画像失败: {str(e)}"
+            }
+        )
+
+
+@router.get("/profile/overall")
+async def get_overall_profile():
+    """
+    获取用户综合能力画像（从数据库读取已生成的画像）
+    
+    如果尚未生成，返回提示信息
+    
+    Returns:
+        dict: 画像数据或提示信息
+    """
+    try:
+        from app.services.ability_service import get_ability_service
+        
+        service = get_ability_service()
+        result = await service.get_overall_profile()
+        
+        if result is None:
+            return {
+                "success": False,
+                "message": "尚未生成综合能力画像。请点击「生成画像」按钮。"
+            }
+        
+        return {
+            "success": True,
+            "profile": result["profile"],
+            "generated_at": result["updated_at"]
+        }
+        
+    except Exception as e:
+        logger.error(f"获取综合能力画像失败: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "InternalServerError",
+                "message": "获取综合能力画像失败"
             }
         )

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { getApiConfig, ApiConfig } from './useApiConfig';
 
 // 消息角色类型
 export type Role = 'user' | 'ai' | 'system';
@@ -32,6 +33,7 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
     const [isLoading, setIsLoading] = useState(false);
     const [threadId, setThreadId] = useState<string>("");
     const [interviewProgress, setInterviewProgress] = useState<{ current: number; total: number } | null>(null);
+    const [maxQuestions, setMaxQuestions] = useState(5);
     const abortControllerRef = useRef<AbortController | null>(null);
 
     // 初始化线程ID
@@ -60,6 +62,9 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
         abortControllerRef.current = new AbortController();
 
         try {
+            // 获取用户的 API 配置
+            const userApiConfig = getApiConfig();
+
             const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -70,7 +75,14 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
                     job_description: currentJobDescription || "通用软件工程师",
                     company_info: currentCompanyInfo || "未知",
                     mode: 'mock',
-                    max_questions: 5
+                    max_questions: maxQuestions,
+                    // 添加用户 API 配置（如果有）
+                    api_config: userApiConfig ? {
+                        api_key: userApiConfig.apiKey,
+                        base_url: userApiConfig.baseUrl,
+                        smart_model: userApiConfig.smartModel,
+                        fast_model: userApiConfig.fastModel
+                    } : undefined
                 }),
                 signal: abortControllerRef.current?.signal
             });
@@ -158,14 +170,19 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
         jobDescription: string,
         currentResume: ResumeInfo | null = resume,
         currentThreadId: string = threadId,
-        currentCompanyInfo: string = ""
+        currentCompanyInfo: string = "",
+        maxQuestions: number = 5
     ) => {
         if (!currentResume) return;
 
         setIsLoading(true);
+        setMaxQuestions(maxQuestions);
         setMessages([]); // 新面试时清空消息
 
         try {
+            // 获取用户的 API 配置
+            const userApiConfig = getApiConfig();
+
             const response = await fetch(`${API_BASE_URL}/api/chat/start`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -176,7 +193,14 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
                     job_description: jobDescription,
                     company_info: currentCompanyInfo || "未知",
                     mode: 'mock',
-                    max_questions: 5
+                    max_questions: maxQuestions,
+                    // 添加用户 API 配置（如果有）
+                    api_config: userApiConfig ? {
+                        api_key: userApiConfig.apiKey,
+                        base_url: userApiConfig.baseUrl,
+                        smart_model: userApiConfig.smartModel,
+                        fast_model: userApiConfig.fastModel
+                    } : undefined
                 })
             });
 
@@ -292,6 +316,7 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
         rollbackChat,
         stopStreaming,
         interviewProgress,
-        setInterviewProgress
+        setInterviewProgress,
+        setMaxQuestions
     };
 }

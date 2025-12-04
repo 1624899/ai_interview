@@ -88,6 +88,9 @@ class InterviewState(TypedDict):
     # 追问控制
     current_sub_question: Optional[str]
     max_follow_ups: int
+    
+    # 用户 API 配置（可选）
+    api_config: Optional[dict]
 
 
 # ============================================================================
@@ -134,7 +137,10 @@ async def node_planner(state: InterviewState):
     """
     
     # 禁用流式输出以避免 OpenAI structured output 的 bug
-    structured_llm = llm.with_structured_output(PlanOutput).with_config({"run_name": "planner"})
+    # 使用用户配置的 LLM 或默认 LLM
+    api_config = state.get("api_config")
+    current_llm = llms.get_llm_for_request(api_config, channel="smart")
+    structured_llm = current_llm.with_structured_output(PlanOutput).with_config({"run_name": "planner"})
     plan = await structured_llm.ainvoke(prompt, config={"callbacks": []})
     
     interview_plan = [q.model_dump() for q in plan.questions]
@@ -169,8 +175,9 @@ async def node_responder(state: InterviewState):
     messages = state.get("messages", [])
     turn_phase = state.get("turn_phase", "opening")
     
-    # 使用 Fast LLM 保证速度
-    fast_llm = llms.get_fast_llm()
+    # 使用用户配置的 LLM 或默认 Fast LLM
+    api_config = state.get("api_config")
+    fast_llm = llms.get_llm_for_request(api_config, channel="fast")
     
     # ==========================================
     # 1. 开场阶段 (Opening Phase)
@@ -247,43 +254,60 @@ async def _trigger_background_analysis(state):
     """触发后台画像分析（异步任务）"""
     try:
         from app.services.analysis_service import get_analysis_service
+        from app.database.session_service import SessionService
         
+        # 获取 session_id
+        session_id = state.get("session_id")
+        if not session_id:
+            logger.warning("[AnalysisService] session_id 缺失，跳过分析")
+            return
+
+        logger.info(f"[AnalysisService] 开始触发后台分析，session_id: {session_id}")
+
+        # 从数据库获取完整会话信息（包括消息和简历内容）
+        # 这样即使发生回退，也能获取到数据库中存储的完整/最新状态
+        session_service = SessionService()
+        session = await session_service.get_session(session_id, include_resume_content=True)
+        
+        if not session:
+            logger.warning(f"[AnalysisService] 无法从数据库获取会话 {session_id}")
+            return
+
         # 提取必要信息
-        resume = state.get("resume_context", "")
-        job_desc = state.get("job_description", "")
-        company_info = state.get("company_info", "未知")
+        resume = session.metadata.resume_content or ""
+        job_desc = session.metadata.job_description or ""
+        company_info = session.metadata.company_info or "未知"
+        messages = session.messages
+        
+        logger.info(f"[AnalysisService] 从数据库获取到 {len(messages)} 条消息")
         
         # 构建 QA 历史
-        messages = state.get("messages", [])
         qa_history = []
         
-        # 正确解析 messages 列表
+        # 解析 messages 列表
         # 结构：[AI 问题1, User 回答1, AI 问题2, User 回答2, ...]
-        for i in range(0, len(messages) - 1, 2):
-            if i + 1 < len(messages):
-                ai_msg = messages[i]
-                user_msg = messages[i + 1]
+        # 注意：数据库中的消息是按时间顺序排列的
+        for i in range(0, len(messages) - 1):
+            msg = messages[i]
+            next_msg = messages[i+1]
+            
+            # 寻找 "AI提问 -> User回答" 的模式
+            if msg.role == "ai" and next_msg.role == "user":
+                question = msg.content
+                answer = next_msg.content
                 
-                # 提取内容
-                question = ai_msg.content if hasattr(ai_msg, 'content') else str(ai_msg)
-                answer = user_msg.content if hasattr(user_msg, 'content') else str(user_msg)
-                
-                # 只保留有效的 QA 对
                 if question.strip() and answer.strip():
                     qa_history.append({
                         "question": question,
                         "answer": answer
                     })
         
+        logger.info(f"[AnalysisService] 解析出 {len(qa_history)} 个有效的 QA 对")
+        
         # 如果没有 QA 历史，不触发分析
         if not qa_history:
-            logger.debug("[AnalysisService] QA 历史为空，跳过分析")
-            return
-        
-        # 获取 session_id
-        session_id = state.get("session_id")
-        if not session_id:
-            logger.warning("[AnalysisService] session_id 缺失，跳过分析")
+            logger.warning("[AnalysisService] QA 历史为空，跳过分析")
+            logger.warning(f"[AnalysisService] 消息详情: {[(m.role, len(m.content)) for m in messages[:10]]}")
             return
         
         logger.info(f"[AnalysisService] 开始异步分析会话 {session_id}，共 {len(qa_history)} 轮对话")
@@ -292,8 +316,19 @@ async def _trigger_background_analysis(state):
         service = get_analysis_service()
         await service.analyze_candidate(session_id, resume, job_desc, company_info, qa_history)
         
+        logger.info(f"[AnalysisService] 会话 {session_id} 的画像分析已完成")
+        
+        # 触发分析后，使能力画像缓存失效，以便下次获取最新数据
+        try:
+            from app.services.ability_service import get_ability_service
+            # 注意：这里假设 ability_service 有 invalidate_cache 方法，或者我们不需要显式失效
+            # 因为 AbilityAnalysisService 是基于数据库读取的，只要 session_service 更新了，它就能读到
+            pass
+        except Exception:
+            pass
+        
     except Exception as e:
-        logger.error(f"后台分析触发失败: {str(e)}")
+        logger.error(f"后台分析触发失败: {str(e)}", exc_info=True)
 
 
 async def node_summary(state: InterviewState):
@@ -307,8 +342,9 @@ async def node_summary(state: InterviewState):
     system_prompt = strategy.get_feedback_prompt()
     
     # 调用 LLM 生成总结
-    # 使用 Smart LLM
-    smart_llm = llms.get_smart_llm()
+    # 使用用户配置的 LLM 或默认 Smart LLM
+    api_config = state.get("api_config")
+    smart_llm = llms.get_llm_for_request(api_config, channel="smart")
     
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
     response = await smart_llm.ainvoke(messages)

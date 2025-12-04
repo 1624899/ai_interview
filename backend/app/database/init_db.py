@@ -59,6 +59,19 @@ def init_database():
         ''')
         logger.info("✓ messages 表已创建/验证")
         
+        # 创建用户综合能力画像表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_profile (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL DEFAULT 'default_user',
+                profile_data TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(user_id)
+            )
+        ''')
+        logger.info("✓ user_profile 表已创建/验证")
+        
         
         # ====================================================================
         # 索引创建

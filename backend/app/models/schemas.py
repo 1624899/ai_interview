@@ -8,6 +8,22 @@ from pydantic import BaseModel, Field
 from enum import Enum
 
 
+# ============================================================================
+# 用户 API 配置模型
+# ============================================================================
+
+class ApiConfig(BaseModel):
+    """用户自定义的 API 配置 - 支持双通道"""
+    api_key: str = Field(..., description="API Key")
+    base_url: str = Field(..., description="API Base URL")
+    smart_model: str = Field(..., description="Smart 模型（复杂任务：规划、总结）")
+    fast_model: str = Field(..., description="Fast 模型（快速响应：问答、点评）")
+
+
+# ============================================================================
+# 请求/响应模型
+# ============================================================================
+
 class ChatRequest(BaseModel):
     """聊天请求模型"""
     message: str = Field(..., description="用户消息内容")
@@ -17,6 +33,9 @@ class ChatRequest(BaseModel):
     job_description: str = Field(..., description="岗位描述")
     company_info: str = Field(default="未知", description="公司背景信息")
     max_questions: int = Field(default=5, description="最大问题数量")
+    # 用户配置（可选）
+    user_id: Optional[str] = Field(default=None, description="用户标识")
+    api_config: Optional[ApiConfig] = Field(default=None, description="用户自定义 API 配置")
 
 
 class ChatStreamResponse(BaseModel):
@@ -44,6 +63,7 @@ class ResumeInfo(BaseModel):
     use_count: int = Field(default=0, description="使用次数")
     last_used: Optional[str] = Field(None, description="最后使用时间")
 
+
 class InterviewStartRequest(BaseModel):
     """面试开始请求模型"""
     thread_id: str = Field(..., description="会话线程ID")
@@ -53,6 +73,9 @@ class InterviewStartRequest(BaseModel):
     job_description: str = Field(..., description="岗位描述")
     company_info: str = Field(default="未知", description="公司背景信息")
     max_questions: int = Field(default=5, description="最大问题数量")
+    # 用户配置（可选）
+    user_id: Optional[str] = Field(default=None, description="用户标识")
+    api_config: Optional[ApiConfig] = Field(default=None, description="用户自定义 API 配置")
 
 
 class ErrorResponse(BaseModel):
@@ -66,6 +89,13 @@ class RollbackRequest(BaseModel):
     """回退请求模型"""
     thread_id: str = Field(..., description="会话线程ID")
     index: int = Field(..., description="回退到的消息索引（0-based）")
+
+
+class ApiConfigValidateRequest(BaseModel):
+    """API 配置验证请求"""
+    api_key: str = Field(..., description="API Key")
+    base_url: str = Field(..., description="API Base URL")
+    model: str = Field(..., description="模型名称")
 
 
 # ============================================================================

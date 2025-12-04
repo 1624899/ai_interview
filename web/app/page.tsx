@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Upload, FileText, Loader2, PanelLeft, Bot, Sparkles, GraduationCap, Timer, Maximize2, Square, ArrowDown, Mic } from "lucide-react";
+import { Upload, FileText, Loader2, PanelLeft, Bot, Sparkles, GraduationCap, Timer, Maximize2, Square, ArrowDown, Mic, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "@/components/ChatMessage";
 import { Textarea } from "@/components/ui/textarea";
 import { SessionSidebar } from "@/components/SessionSidebar";
+import { AbilityProfileView } from "@/components/AbilityProfileView";
+import { SettingsDialog } from "@/components/SettingsDialog";
 import { useInterviewChat } from "@/hooks/useInterviewChat";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { useSessionManagement } from "@/hooks/useSessionManagement";
+import { useApiConfig } from "@/hooks/useApiConfig";
 import { cn } from "@/lib/utils";
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -23,9 +26,12 @@ import {
 
 export default function InterviewPage() {
   const [showSidebar, setShowSidebar] = useState(true);
+  const [showAbilityProfile, setShowAbilityProfile] = useState(false); // 新增：控制能力画像显示
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false); // 新增：控制设置弹窗
   const [input, setInput] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [companyInfo, setCompanyInfo] = useState(""); // 新增：公司信息
+  const [questionCount, setQuestionCount] = useState(5); // 新增：问题数量，默认为5
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
   const [tempJobDescription, setTempJobDescription] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,6 +39,9 @@ export default function InterviewPage() {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+
+  // API 配置
+  const { config: apiConfig, isConfigured, saveConfig } = useApiConfig();
 
   const {
     messages,
@@ -49,7 +58,8 @@ export default function InterviewPage() {
     rollbackChat,
     stopStreaming,
     interviewProgress,
-    setInterviewProgress
+    setInterviewProgress,
+    setMaxQuestions
   } = useInterviewChat();
 
   const {
@@ -191,7 +201,7 @@ export default function InterviewPage() {
 
       // 启动面试流程（后端会自动创建会话并保存完整信息）
       try {
-        await startInterview(jobDescription.trim(), resume, newThreadId, companyInfo.trim());
+        await startInterview(jobDescription.trim(), resume, newThreadId, companyInfo.trim(), questionCount);
 
         // 刷新会话列表以获取后端生成的最新会话
         await fetchSessions('active', 'mock');
@@ -219,6 +229,7 @@ export default function InterviewPage() {
           current: session.metadata.question_count,
           total: session.metadata.max_questions
         });
+        setMaxQuestions(session.metadata.max_questions);
       }
 
       // 如果是移动端，选择后自动关闭侧边栏
@@ -259,6 +270,8 @@ export default function InterviewPage() {
         onClose={() => setShowSidebar(false)}
         onSessionSelect={handleSessionSelect}
         onNewSession={handleNewSession}
+        onShowAbilityProfile={() => setShowAbilityProfile(true)}
+        onOpenSettings={() => setShowSettingsDialog(true)}
         currentSessionId={currentSession?.session_id}
         sessions={sessions}
         onDeleteSession={deleteSession}
@@ -284,7 +297,31 @@ export default function InterviewPage() {
           </div>
         )}
 
-        {showWelcome ? (
+        {/* 如果显示能力画像 */}
+        {showAbilityProfile ? (
+          <div className="flex-1 flex flex-col h-full relative">
+            {/* 顶部返回按钮 */}
+            <div className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+              <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAbilityProfile(false)}
+                  className="gap-2"
+                >
+                  <X className="w-4 h-4" />
+                  返回对话
+                </Button>
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold text-gray-900">综合能力画像</h2>
+                  <p className="text-xs text-gray-500">基于最近5次面试的综合分析</p>
+                </div>
+              </div>
+            </div>
+            {/* 能力画像内容 */}
+            <AbilityProfileView />
+          </div>
+        ) : showWelcome ? (
           /* 欢迎页 / 新建会话页 */
           <div className="flex-1 flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 relative">
             {/* ... (省略欢迎页内容，保持不变) ... */}
@@ -397,10 +434,36 @@ export default function InterviewPage() {
                     value={companyInfo}
                     onChange={(e) => setCompanyInfo(e.target.value)}
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm transition-all hover:border-teal-500 hover:ring-2 hover:ring-teal-50 focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none"
-                    placeholder="例如：大厂、创业公司、外企等（可选）"
+                    placeholder="例如：大厂、创业公司、外企等（也可填主要业务、规模大小）"
                   />
                   <p className="text-xs text-gray-400">
                     提供公司信息可以让面试题目更贴近实际场景
+                  </p>
+                </div>
+
+                {/* 3. 设置问题数量 */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-100 text-teal-600 text-xs font-bold">3</span>
+                    面试问题数量 (3-10)
+                  </label>
+
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="3"
+                      max="10"
+                      step="1"
+                      value={questionCount}
+                      onChange={(e) => setQuestionCount(parseInt(e.target.value))}
+                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
+                    />
+                    <div className="w-12 h-10 flex items-center justify-center bg-teal-50 border border-teal-100 rounded-lg text-teal-700 font-semibold">
+                      {questionCount}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    建议设置为 5 个问题，既能充分展示能力，又不会过于疲劳
                   </p>
                 </div>
 
@@ -427,8 +490,13 @@ export default function InterviewPage() {
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></div>
-                        <span className="font-medium text-gray-700">面试进行中</span>
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          interviewProgress.current >= interviewProgress.total ? "bg-gray-400" : "bg-teal-500 animate-pulse"
+                        )}></div>
+                        <span className="font-medium text-gray-700">
+                          {interviewProgress.current >= interviewProgress.total ? "面试已完成" : "面试进行中"}
+                        </span>
                       </div>
                       <span className="text-gray-400">·</span>
                       <span className="text-gray-500">
@@ -601,6 +669,14 @@ export default function InterviewPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 设置弹窗 */}
+      <SettingsDialog
+        open={showSettingsDialog}
+        onOpenChange={setShowSettingsDialog}
+        config={apiConfig}
+        onSave={saveConfig}
+      />
     </div>
   );
 }

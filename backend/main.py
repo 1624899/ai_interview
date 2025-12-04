@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import chat, upload, sessions
+from app.api import chat, upload, sessions, config
 from app.models.schemas import ErrorResponse
 from app.database import db_manager
 
@@ -200,6 +200,7 @@ async def health_check():
 app.include_router(chat.router)
 app.include_router(upload.router)
 app.include_router(sessions.router)
+app.include_router(config.router)
 
 
 # 启动信息

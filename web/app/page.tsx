@@ -456,11 +456,11 @@ export default function InterviewPage() {
             )}
 
             <ScrollArea
-              className="h-full w-full"
+              className="flex-1 w-full min-h-0 overflow-hidden"
               viewportRef={scrollViewportRef}
               onScroll={handleScroll}
             >
-              <div className="max-w-3xl mx-auto px-4 py-10 space-y-6 pb-48">
+              <div className="max-w-3xl mx-auto px-4 pt-10 pb-4 space-y-6">
                 {messages.map((m, i) => (
                   <ChatMessage
                     key={i}
@@ -502,7 +502,7 @@ export default function InterviewPage() {
             </ScrollArea>
 
             {/* 底部输入框 */}
-            <div className="absolute bottom-0 left-0 right-0 pt-0 pb-6 px-6 bg-gradient-to-t from-white via-white to-transparent">
+            <div className="relative w-full bg-white border-t border-gray-100 px-6 py-4 z-20">
               <div className="max-w-3xl mx-auto relative">
                 {/* 跳转到底部按钮 - 移动到输入框上方 */}
                 {showScrollButton && (
@@ -519,7 +519,7 @@ export default function InterviewPage() {
                   </div>
                 )}
 
-                <div className="relative bg-white rounded-2xl shadow-lg border border-gray-200 focus-within:ring-2 focus-within:ring-teal-100 transition-all">
+                <div className="relative bg-white rounded-2xl shadow-sm border border-gray-200 focus-within:ring-2 focus-within:ring-teal-100 transition-all">
                   <Textarea
                     placeholder="输入您的回答..."
                     className="min-h-[120px] max-h-[400px] w-full resize-none border-0 bg-transparent focus-visible:ring-0 p-5 pr-14 text-base leading-relaxed"

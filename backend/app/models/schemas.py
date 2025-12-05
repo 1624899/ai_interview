@@ -12,12 +12,17 @@ from enum import Enum
 # 用户 API 配置模型
 # ============================================================================
 
-class ApiConfig(BaseModel):
-    """用户自定义的 API 配置 - 支持双通道"""
+class ModelChannelConfig(BaseModel):
+    """单个通道的模型配置"""
     api_key: str = Field(..., description="API Key")
     base_url: str = Field(..., description="API Base URL")
-    smart_model: str = Field(..., description="Smart 模型（复杂任务：规划、总结）")
-    fast_model: str = Field(..., description="Fast 模型（快速响应：问答、点评）")
+    model: str = Field(..., description="模型名称")
+
+
+class ApiConfig(BaseModel):
+    """用户自定义的 API 配置 - 支持双通道独立配置"""
+    smart: ModelChannelConfig = Field(..., description="Smart 通道配置（复杂任务）")
+    fast: ModelChannelConfig = Field(..., description="Fast 通道配置（快速响应）")
 
 
 # ============================================================================

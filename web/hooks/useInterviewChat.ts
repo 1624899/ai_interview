@@ -78,10 +78,16 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
                     max_questions: maxQuestions,
                     // 添加用户 API 配置（如果有）
                     api_config: userApiConfig ? {
-                        api_key: userApiConfig.apiKey,
-                        base_url: userApiConfig.baseUrl,
-                        smart_model: userApiConfig.smartModel,
-                        fast_model: userApiConfig.fastModel
+                        smart: {
+                            api_key: userApiConfig.smartModel.apiKey,
+                            base_url: userApiConfig.smartModel.baseUrl,
+                            model: userApiConfig.smartModel.model
+                        },
+                        fast: {
+                            api_key: userApiConfig.fastModel.apiKey,
+                            base_url: userApiConfig.fastModel.baseUrl,
+                            model: userApiConfig.fastModel.model
+                        }
                     } : undefined
                 }),
                 signal: abortControllerRef.current?.signal
@@ -196,10 +202,16 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
                     max_questions: maxQuestions,
                     // 添加用户 API 配置（如果有）
                     api_config: userApiConfig ? {
-                        api_key: userApiConfig.apiKey,
-                        base_url: userApiConfig.baseUrl,
-                        smart_model: userApiConfig.smartModel,
-                        fast_model: userApiConfig.fastModel
+                        smart: {
+                            api_key: userApiConfig.smartModel.apiKey,
+                            base_url: userApiConfig.smartModel.baseUrl,
+                            model: userApiConfig.smartModel.model
+                        },
+                        fast: {
+                            api_key: userApiConfig.fastModel.apiKey,
+                            base_url: userApiConfig.fastModel.baseUrl,
+                            model: userApiConfig.fastModel.model
+                        }
                     } : undefined
                 })
             });

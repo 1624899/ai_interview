@@ -191,33 +191,38 @@ def get_llm_for_request(api_config: Optional[dict] = None, channel: str = "smart
     """
     获取用于处理请求的 LLM 实例
     
-    优先使用用户配置，如果没有则使用服务器默认配置
-    支持双通道：smart_model 用于复杂任务，fast_model 用于快速响应
+    **强制要求用户配置 API**，不再使用服务器默认配置
+    支持双通道独立配置：smart 和 fast 可以使用不同的 API 提供商
     
     Args:
-        api_config: 用户的 API 配置，包含 api_key, base_url, smart_model, fast_model
+        api_config: 用户的 API 配置，结构为 { smart: {...}, fast: {...} }
         channel: 使用的通道，"fast" 或 "smart"
         
     Returns:
         ChatOpenAI: LLM 实例
+        
+    Raises:
+        ValueError: 如果用户未提供 API 配置
     """
-    # 如果用户提供了配置，使用用户配置
-    if api_config and api_config.get("api_key"):
-        # 根据 channel 选择对应的模型
-        model = api_config.get("smart_model") if channel == "smart" else api_config.get("fast_model")
-        print(f"📱 使用用户自定义 API 配置 ({channel}): {model}")
-        return create_llm_from_config(
-            api_key=api_config["api_key"],
-            base_url=api_config["base_url"],
-            model=model
+    # 检查是否提供了用户配置
+    if not api_config:
+        raise ValueError(
+            "未检测到 API 配置。请在设置中配置您的大模型 API 后再使用本功能。"
         )
     
-    # 否则使用服务器默认配置
-    print(f"🖥️ 使用服务器默认 API 配置 ({channel} channel)")
-    if channel == "fast":
-        return get_fast_llm()
-    else:
-        return get_smart_llm()
+    # 获取对应通道的配置
+    channel_config = api_config.get(channel)
+    if not channel_config or not channel_config.get("api_key"):
+        raise ValueError(
+            f"未检测到 {channel.upper()} 通道的 API 配置。请在设置中完整配置 Smart 和 Fast 模型。"
+        )
+    
+    print(f"使用用户自定义 API 配置 ({channel}): {channel_config.get('model')}")
+    return create_llm_from_config(
+        api_key=channel_config["api_key"],
+        base_url=channel_config["base_url"],
+        model=channel_config["model"]
+    )
 
 
 # ============================================================================

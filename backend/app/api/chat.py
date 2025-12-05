@@ -35,6 +35,17 @@ async def start_interview(request: InterviewStartRequest):
     Returns:
         dict: 会话开始结果
     """
+    print("=" * 80)
+    print("📥 收到 start_interview 请求")
+    print(f"thread_id: {request.thread_id}")
+    print(f"mode: {request.mode}")
+    print(f"max_questions: {request.max_questions}")
+    print(f"resume_filename: {request.resume_filename}")
+    print(f"job_description: {request.job_description[:100]}..." if len(request.job_description) > 100 else f"job_description: {request.job_description}")
+    print(f"company_info: {request.company_info}")
+    print(f"api_config: {request.api_config}")
+    print("=" * 80)
+    
     try:
         # 初始化图谱（异步）
         graph = await build_interview_graph(request.mode)
@@ -47,10 +58,16 @@ async def start_interview(request: InterviewStartRequest):
         api_config = None
         if request.api_config:
             api_config = {
-                "api_key": request.api_config.api_key,
-                "base_url": request.api_config.base_url,
-                "smart_model": request.api_config.smart_model,
-                "fast_model": request.api_config.fast_model
+                "smart": {
+                    "api_key": request.api_config.smart.api_key,
+                    "base_url": request.api_config.smart.base_url,
+                    "model": request.api_config.smart.model
+                },
+                "fast": {
+                    "api_key": request.api_config.fast.api_key,
+                    "base_url": request.api_config.fast.base_url,
+                    "model": request.api_config.fast.model
+                }
             }
         
         inputs = {
@@ -168,10 +185,16 @@ async def stream_chat(request: ChatRequest):
         api_config = None
         if request.api_config:
             api_config = {
-                "api_key": request.api_config.api_key,
-                "base_url": request.api_config.base_url,
-                "smart_model": request.api_config.smart_model,
-                "fast_model": request.api_config.fast_model
+                "smart": {
+                    "api_key": request.api_config.smart.api_key,
+                    "base_url": request.api_config.smart.base_url,
+                    "model": request.api_config.smart.model
+                },
+                "fast": {
+                    "api_key": request.api_config.fast.api_key,
+                    "base_url": request.api_config.fast.base_url,
+                    "model": request.api_config.fast.model
+                }
             }
         
         inputs = {

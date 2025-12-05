@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Upload, FileText, Loader2, PanelLeft, Bot, Sparkles, GraduationCap, Timer, Maximize2, Square, ArrowDown, Mic, X } from "lucide-react";
+import { Upload, FileText, Loader2, PanelLeft, Bot, Sparkles, GraduationCap, Timer, Maximize2, Square, ArrowDown, Mic, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "@/components/ChatMessage";
@@ -41,7 +41,15 @@ export default function InterviewPage() {
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
 
   // API 配置
-  const { config: apiConfig, isConfigured, saveConfig } = useApiConfig();
+  const {
+    config: apiConfig,
+    isConfigured,
+    addModel,
+    updateModel,
+    deleteModel,
+    setSmartModel,
+    setFastModel
+  } = useApiConfig();
 
   const {
     messages,
@@ -72,7 +80,8 @@ export default function InterviewPage() {
     deleteSession,
     togglePinSession,
     updateSessionTitle,
-    loading: sessionLoading
+    loading: sessionLoading,
+    setCurrentSessionManual
   } = useSessionManagement();
 
   const { isListening, toggleListening } = useSpeechToText({
@@ -199,6 +208,24 @@ export default function InterviewPage() {
       const newThreadId = uuidv4();
       setThreadId(newThreadId);
 
+      // 1. 立即设置进度，解决顶部进度条不显示问题
+      setInterviewProgress({ current: 0, total: questionCount });
+
+      // 2. 手动设置当前会话，解决侧边栏不高亮问题
+      setCurrentSessionManual({
+        session_id: newThreadId,
+        title: "新模拟面试",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        metadata: {
+          mode: 'mock',
+          question_count: 0,
+          max_questions: questionCount,
+          status: 'active'
+        },
+        messages: []
+      });
+
       // 启动面试流程（后端会自动创建会话并保存完整信息）
       try {
         await startInterview(jobDescription.trim(), resume, newThreadId, companyInfo.trim(), questionCount);
@@ -237,6 +264,8 @@ export default function InterviewPage() {
         setShowSidebar(false);
       }
     }
+    // 确保关闭能力画像，返回聊天界面
+    setShowAbilityProfile(false);
   };
 
   // 处理新建会话
@@ -246,6 +275,8 @@ export default function InterviewPage() {
     setThreadId(uuidv4());
     setJobDescription(""); // 重置岗位描述
     setInterviewProgress(null);
+    // 确保关闭能力画像，返回聊天界面
+    setShowAbilityProfile(false);
   };
 
   // 处理编辑会话标题
@@ -258,8 +289,8 @@ export default function InterviewPage() {
     await togglePinSession(sessionId, pinned);
   };
 
-  // 判断是否显示欢迎页（没有消息且没有当前会话，且不在加载/流式传输中）
-  const showWelcome = messages.length === 0 && !currentSession && !isLoading && !isStreaming;
+  // 判断是否显示欢迎页（没有消息且没有当前会话，且不在流式传输中）
+  const showWelcome = messages.length === 0 && !currentSession && !isStreaming;
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-white text-[#1d1d1f] font-sans antialiased">
@@ -467,11 +498,32 @@ export default function InterviewPage() {
                   </p>
                 </div>
 
+                {/* API 配置提示 */}
+                {!isConfigured && (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-amber-900">需要配置 API</p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        请先在右上角设置中配置您的大模型 API，才能开始使用面试功能
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowSettingsDialog(true)}
+                      className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                    >
+                      去配置
+                    </Button>
+                  </div>
+                )}
+
                 {/* 4. 开始按钮 */}
                 <Button
-                  className="w-full h-12 text-base font-medium bg-teal-600 hover:bg-teal-700 shadow-lg shadow-teal-200 transition-all"
+                  className="w-full h-12 text-base font-medium bg-teal-600 hover:bg-teal-700 shadow-lg shadow-teal-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleStartInterview}
-                  disabled={!resume || !jobDescription.trim() || isLoading}
+                  disabled={!resume || !jobDescription.trim() || isLoading || !isConfigured}
                 >
                   {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Sparkles className="mr-2 h-5 w-5" />}
                   开始面试
@@ -675,7 +727,11 @@ export default function InterviewPage() {
         open={showSettingsDialog}
         onOpenChange={setShowSettingsDialog}
         config={apiConfig}
-        onSave={saveConfig}
+        onAddModel={addModel}
+        onUpdateModel={updateModel}
+        onDeleteModel={deleteModel}
+        onSetSmartModel={setSmartModel}
+        onSetFastModel={setFastModel}
       />
     </div>
   );

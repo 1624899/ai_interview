@@ -329,6 +329,11 @@ export function useSessionManagement() {
         }
     }, [currentSession]);
 
+    // 手动设置当前会话（用于前端临时状态更新）
+    const setCurrentSessionManual = useCallback((session: InterviewSession | null) => {
+        setCurrentSession(session);
+    }, []);
+
     return {
         // 状态
         sessions,
@@ -345,5 +350,6 @@ export function useSessionManagement() {
         clearCurrentSession,
         togglePinSession,
         updateSessionTitle,
+        setCurrentSessionManual,
     };
 }

@@ -77,13 +77,14 @@ export function useUserIdentity() {
  * @returns 当前用户 ID 或生成新的
  */
 export function getUserId(): string {
-    if (typeof window === 'undefined') return '';
+    if (typeof window === 'undefined') return 'default_user';
 
     let userId = localStorage.getItem(USER_ID_KEY);
 
     if (!userId) {
         userId = uuidv4();
         localStorage.setItem(USER_ID_KEY, userId);
+        console.log('🆕 生成新用户标识:', userId.substring(0, 8) + '...');
     }
 
     return userId;

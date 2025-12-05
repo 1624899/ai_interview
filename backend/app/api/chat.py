@@ -7,7 +7,8 @@ import json
 import logging
 import uuid
 from typing import AsyncGenerator
-from fastapi import APIRouter, HTTPException
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 
@@ -25,7 +26,10 @@ session_service = SessionService()
 
 
 @router.post("/start")
-async def start_interview(request: InterviewStartRequest):
+async def start_interview(
+    request: InterviewStartRequest,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
     """
     开始新的面试会话
     
@@ -94,7 +98,8 @@ async def start_interview(request: InterviewStartRequest):
                 resume_content=request.resume_context,
                 job_description=request.job_description,
                 company_info=getattr(request, "company_info", "未知"),
-                max_questions=request.max_questions
+                max_questions=request.max_questions,
+                user_id=x_user_id or "default_user"
             )
         
         # 生成并更新会话标题
@@ -405,18 +410,26 @@ async def end_chat_session(thread_id: str):
 
 
 @router.post("/rollback")
-async def rollback_chat(request: RollbackRequest):
+async def rollback_chat(
+    request: RollbackRequest,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
     """
     回退聊天会话
     
     Args:
         request: 回退请求
+        x_user_id: 用户ID（从 Header 中获取，用于权限校验）
         
     Returns:
         dict: 回退结果
     """
     try:
-        success = await session_service.rollback_session(request.thread_id, request.index)
+        success = await session_service.rollback_session(
+            request.thread_id, 
+            request.index,
+            user_id=x_user_id
+        )
         
         if not success:
             raise HTTPException(status_code=404, detail="Session or message not found")
@@ -441,7 +454,9 @@ async def rollback_chat(request: RollbackRequest):
 
 
 @router.post("/profile/generate")
-async def generate_profile():
+async def generate_profile(
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
     """
     手动触发：生成用户综合能力画像
     
@@ -453,9 +468,10 @@ async def generate_profile():
     try:
         from app.services.ability_service import get_ability_service
         
+        user_id = x_user_id or "default_user"
         service = get_ability_service()
         # 注意：现在返回的是字典 {"profile": CandidateProfile, "warning": str}
-        result = await service.generate_overall_profile()
+        result = await service.generate_overall_profile(user_id=user_id)
         
         profile = result["profile"]
         warning = result.get("warning")
@@ -496,7 +512,9 @@ async def generate_profile():
 
 
 @router.get("/profile/overall")
-async def get_overall_profile():
+async def get_overall_profile(
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
     """
     获取用户综合能力画像（从数据库读取已生成的画像）
     
@@ -508,8 +526,9 @@ async def get_overall_profile():
     try:
         from app.services.ability_service import get_ability_service
         
+        user_id = x_user_id or "default_user"
         service = get_ability_service()
-        result = await service.get_overall_profile()
+        result = await service.get_overall_profile(user_id=user_id)
         
         if result is None:
             return {

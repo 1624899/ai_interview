@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Trash2, MoreHorizontal, GraduationCap, Timer, Edit2, Pin, PinOff } from 'lucide-react';
-import { useSessionManagement, SessionListItem } from '@/hooks/useSessionManagement';
+import { SessionListItem } from '@/store/useInterviewStore';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';

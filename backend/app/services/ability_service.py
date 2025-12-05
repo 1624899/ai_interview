@@ -60,8 +60,8 @@ class AbilityAnalysisService:
                 raise ValueError(f"生成过于频繁，请等待 {remaining} 秒后再试")
                 
             try:
-                # 3. 获取最近5次画像
-                recent_profiles = await self.session_service.get_recent_profiles(limit=5)
+                # 3. 获取最近5次画像（只获取当前用户的）
+                recent_profiles = await self.session_service.get_recent_profiles(limit=5, user_id=user_id)
                 
                 if not recent_profiles:
                     logger.warning("无历史面试记录，无法生成综合画像")

@@ -33,6 +33,33 @@ class SessionService:
         self.db_path = db_path or DB_PATH
         logger.info(f"SessionService 使用数据库: {self.db_path}")
     
+    async def _check_session_access(
+        self, 
+        db, 
+        session_id: str, 
+        user_id: Optional[str] = None
+    ) -> bool:
+        """
+        检查用户是否有权访问指定会话
+        
+        Args:
+            db: 数据库连接
+            session_id: 会话ID
+            user_id: 用户ID（可选，如果提供则校验归属）
+            
+        Returns:
+            bool: 是否有权限访问
+        """
+        sql = 'SELECT 1 FROM sessions WHERE session_id = ?'
+        params = [session_id]
+        
+        if user_id:
+            sql += ' AND user_id = ?'
+            params.append(user_id)
+            
+        async with db.execute(sql, params) as cursor:
+            return await cursor.fetchone() is not None
+    
     async def create_session(
         self,
         session_id: str,
@@ -56,7 +83,6 @@ class SessionService:
             resume_content: 简历全文内容
             job_description: 岗位描述
             company_info: 公司信息
-            company_info: 公司信息
             max_questions: 最大问题数
             user_id: 用户ID
             
@@ -68,8 +94,6 @@ class SessionService:
             mode_text = "辅导模式" if mode == "coach" else "模拟面试"
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
             title = f"{mode_text} - {timestamp}"
-        
-        now = datetime.now().isoformat()
         
         now = datetime.now().isoformat()
         
@@ -443,9 +467,6 @@ class SessionService:
             int: 会话数量
         """
         async with db_manager.get_connection() as db:
-            if status:
-                async with db.execute('SELECT COUNT(*) as count FROM sessions WHERE status = ?', (status,)) as cursor:
-                    result = await cursor.fetchone()
             sql = 'SELECT COUNT(*) as count FROM sessions'
             conditions = []
             params = []
@@ -466,7 +487,7 @@ class SessionService:
             
             return result[0] if result else 0
 
-    async def rollback_session(self, session_id: str, index: int) -> bool:
+    async def rollback_session(self, session_id: str, index: int, user_id: Optional[str] = None) -> bool:
         """
         回退会话到指定索引
         
@@ -478,12 +499,18 @@ class SessionService:
         Args:
             session_id: 会话ID
             index: 消息索引（0-based）
+            user_id: 用户ID（可选，用于权限校验）
             
         Returns:
             bool: 是否成功
         """
         async with db_manager.get_connection() as db:
             try:
+                # 权限校验
+                if not await self._check_session_access(db, session_id, user_id):
+                    logger.warning(f"回退失败：会话 {session_id} 不存在或无权访问")
+                    return False
+                
                 # 1. 数据库层面处理
                 if index == 0:
                     # 情况A: 完全重置（用户点击重新生成第一条消息，或清空会话）
@@ -662,25 +689,34 @@ class SessionService:
                         logger.error(f"解析面试题目清单失败: {session_id}")
                         return None
                 return None
-    async def get_recent_profiles(self, limit: int = 5) -> List[Dict[str, Any]]:
+    async def get_recent_profiles(self, limit: int = 5, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         获取最近的有画像的会话画像列表（异步）
         
         Args:
             limit: 数量限制
+            user_id: 用户ID（如果提供则只返回该用户的画像）
             
         Returns:
             List[Dict[str, Any]]: 画像列表
         """
         import json
         async with db_manager.get_connection() as db:
-            async with db.execute('''
+            sql = '''
                 SELECT candidate_profile 
                 FROM sessions 
                 WHERE candidate_profile IS NOT NULL 
-                ORDER BY updated_at DESC 
-                LIMIT ?
-            ''', (limit,)) as cursor:
+            '''
+            params = []
+            
+            if user_id:
+                sql += ' AND user_id = ?'
+                params.append(user_id)
+                
+            sql += ' ORDER BY updated_at DESC LIMIT ?'
+            params.append(limit)
+            
+            async with db.execute(sql, params) as cursor:
                 rows = await cursor.fetchall()
                 
                 profiles = []

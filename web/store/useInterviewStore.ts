@@ -284,10 +284,18 @@ export const useInterviewStore = create<InterviewStore>()(
                     if (!response.ok) throw new Error('删除会话失败');
 
                     const { currentSession, sessions } = get();
+                    const isCurrentSession = currentSession?.session_id === sessionId;
+
+                    // 更新会话列表
                     set({
                         sessions: sessions.filter(s => s.session_id !== sessionId),
-                        currentSession: currentSession?.session_id === sessionId ? null : currentSession,
                     });
+
+                    // 如果删除的是当前会话，跳转到新建界面
+                    if (isCurrentSession) {
+                        get().createNewSession();
+                    }
+
                     return true;
                 } catch (error) {
                     console.error('删除会话错误:', error);

@@ -290,7 +290,7 @@ export default function InterviewPage() {
                   </div>
                   <h1 className="text-4xl font-bold tracking-tight text-gray-900 leading-tight">
                     AI 模拟面试<br />
-                    <span className="text-teal-600">助你拿到 Offer</span>
+                    <span className="text-teal-600">助你拿到理想 Offer</span>
                   </h1>
                   <p className="text-lg text-gray-500 leading-relaxed max-w-md">
                     上传简历，粘贴职位描述，立即开始一场真实的模拟面试。获取实时反馈，提升面试技巧。

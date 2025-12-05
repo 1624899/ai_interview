@@ -13,22 +13,15 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
-    ApiConfig,
     ModelConfig,
     API_PROVIDERS,
     maskApiKey,
-    isModelConfigValid
-} from '@/hooks/useApiConfig';
+    useInterviewStore
+} from '@/store/useInterviewStore';
 
 interface SettingsDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    config: ApiConfig;
-    onAddModel: (model: Omit<ModelConfig, 'id' | 'createdAt'>) => ModelConfig | null;
-    onUpdateModel: (id: string, updates: Partial<ModelConfig>) => boolean;
-    onDeleteModel: (id: string) => boolean;
-    onSetSmartModel: (id: string) => boolean;
-    onSetFastModel: (id: string) => boolean;
 }
 
 // 添加/编辑模型的二级弹窗
@@ -315,14 +308,16 @@ function ModelFormDialog({ open, onClose, onSave, editingModel }: ModelFormDialo
 // 主设置弹窗
 export function SettingsDialog({
     open,
-    onOpenChange,
-    config,
-    onAddModel,
-    onUpdateModel,
-    onDeleteModel,
-    onSetSmartModel,
-    onSetFastModel
+    onOpenChange
 }: SettingsDialogProps) {
+    const {
+        apiConfig: config,
+        addModel: onAddModel,
+        updateModel: onUpdateModel,
+        deleteModel: onDeleteModel,
+        setSmartModel: onSetSmartModel,
+        setFastModel: onSetFastModel
+    } = useInterviewStore();
     const [showModelForm, setShowModelForm] = useState(false);
     const [editingModel, setEditingModel] = useState<ModelConfig | undefined>();
 

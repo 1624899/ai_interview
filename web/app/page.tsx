@@ -1,20 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Upload, FileText, Loader2, PanelLeft, Bot, Sparkles, GraduationCap, Timer, Maximize2, Square, ArrowDown, Mic, X, AlertCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { PanelLeft, Bot, Sparkles, AlertCircle, Loader2, X, Upload, FileText, GraduationCap, Timer, Maximize2, Square, ArrowDown, Mic, Award, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "@/components/ChatMessage";
 import { Textarea } from "@/components/ui/textarea";
 import { SessionSidebar } from "@/components/SessionSidebar";
 import { AbilityProfileView } from "@/components/AbilityProfileView";
 import { SettingsDialog } from "@/components/SettingsDialog";
-import { useInterviewChat } from "@/hooks/useInterviewChat";
+import { useInterviewStore } from "@/store/useInterviewStore";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
-import { useSessionManagement } from "@/hooks/useSessionManagement";
-import { useApiConfig } from "@/hooks/useApiConfig";
 import { cn } from "@/lib/utils";
-import { v4 as uuidv4 } from 'uuid';
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -25,106 +22,175 @@ import {
 } from "@/components/ui/dialog";
 
 export default function InterviewPage() {
+  // ===== 局部 UI 状态 =====
   const [showSidebar, setShowSidebar] = useState(true);
-  const [showAbilityProfile, setShowAbilityProfile] = useState(false); // 新增：控制能力画像显示
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false); // 新增：控制设置弹窗
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [input, setInput] = useState("");
-  const [jobDescription, setJobDescription] = useState("");
-  const [companyInfo, setCompanyInfo] = useState(""); // 新增：公司信息
-  const [questionCount, setQuestionCount] = useState(5); // 新增：问题数量，默认为5
+  const [isMounted, setIsMounted] = useState(false);
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
   const [tempJobDescription, setTempJobDescription] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const [interviewStartTime, setInterviewStartTime] = useState<string>("");
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
 
-  // API 配置
-  const {
-    config: apiConfig,
-    isConfigured,
-    addModel,
-    updateModel,
-    deleteModel,
-    setSmartModel,
-    setFastModel
-  } = useApiConfig();
+  // Refs
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
 
+  // ===== Store 状态与方法 =====
   const {
+    // 状态
     messages,
-    sendMessage,
     isStreaming,
     isLoading,
     resume,
+    jobDescription,
+    companyInfo,
+    interviewProgress,
+    maxQuestions,
+    currentSession,
+    showAbilityProfile,
+    isConfigured,
+    sessions,
+    sessionLoading,
+    threadId,
+
+    // 方法
+    fetchSessions,
+    selectSession,
+    createNewSession,
+    deleteSession,
+    updateSessionTitle,
+    togglePinSession,
+    setJobDescription,
+    setCompanyInfo,
+    setMaxQuestions,
     uploadResume,
     startInterview,
-    threadId,
-    setThreadId,
+    sendMessage,
+    stopStreaming,
+    rollbackChat,
     clearMessages,
     restoreMessages,
-    rollbackChat,
-    stopStreaming,
-    interviewProgress,
     setInterviewProgress,
-    setMaxQuestions
-  } = useInterviewChat();
+    setShowAbilityProfile: setStoreShowAbilityProfile
+  } = useInterviewStore();
 
-  const {
-    sessions,
-    currentSession,
-    createSession,
-    fetchSession,
-    clearCurrentSession,
-    fetchSessions,
-    deleteSession,
-    togglePinSession,
-    updateSessionTitle,
-    loading: sessionLoading,
-    setCurrentSessionManual
-  } = useSessionManagement();
+  // ===== 初始化 =====
+  useEffect(() => {
+    setIsMounted(true);
+    fetchSessions('active', 'mock');
+  }, [fetchSessions]);
 
+  // ===== 语音输入 =====
   const { isListening, toggleListening } = useSpeechToText({
     onTranscript: (text) => {
       setInput((prev) => prev + text);
     }
   });
 
-  // 加载会话列表
-  useEffect(() => {
-    fetchSessions('active', 'mock');
-  }, [fetchSessions]);
+  // ===== 事件处理 =====
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      await uploadResume(e.target.files[0]);
+    }
+  };
+
+  const handleStartInterview = async () => {
+    try {
+      // 记录面试开始时间
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      setInterviewStartTime(timeString);
+
+      await startInterview();
+    } catch (error) {
+      console.error('启动面试失败:', error);
+      // 这里可以添加 toast 提示
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
     const content = input;
     setInput("");
-
-    // 发送消息时强制滚动到底部
-    setAutoScrollEnabled(true);
-    setShowScrollButton(false);
-    // 使用 setTimeout 确保在 UI 更新后滚动
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-
-    await sendMessage(content, threadId, jobDescription, companyInfo);
+    await sendMessage(content);
   };
 
-  const handleSendOption = async (content: string) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  // ===== 消息编辑和重新生成 =====
+  const handleEditMessage = async (index: number, newContent: string) => {
+    if (isStreaming) return;
+    // 回退到该消息之前的状态
+    await rollbackChat(index);
+    // 直接发送编辑后的消息
+    await sendMessage(newContent);
+  };
+
+  const handleRegenerateMessage = async (aiMessageIndex: number) => {
     if (isStreaming) return;
 
-    // 发送消息时强制滚动到底部
-    setAutoScrollEnabled(true);
-    setShowScrollButton(false);
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
+    // 特殊处理：如果是第一条消息（AI开场白），则重新开始面试流程
+    if (aiMessageIndex === 0) {
+      await rollbackChat(0);
+      if (resume) {
+        await startInterview();
+      }
+      return;
+    }
 
-    await sendMessage(content, threadId, jobDescription, companyInfo);
+    // 找到对应的用户消息（AI消息的前一条应该是用户消息）
+    const userMessageIndex = aiMessageIndex - 1;
+    if (userMessageIndex < 0 || messages[userMessageIndex].role !== 'user') {
+      console.error('无法找到对应的用户消息');
+      return;
+    }
+
+    const userMessage = messages[userMessageIndex];
+    // 回退到用户消息之前的状态
+    await rollbackChat(userMessageIndex);
+    // 重新发送原有的用户消息
+    await sendMessage(userMessage.content);
   };
 
-  // 处理滚动事件
+  // ===== 会话管理 =====
+  const handleSessionSelect = async (sessionId: string) => {
+    await selectSession(sessionId);
+    // 确保关闭能力画像
+    setStoreShowAbilityProfile(false);
+    // 如果是移动端，选择后自动关闭侧边栏
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setShowSidebar(false);
+    }
+  };
+
+  const handleNewSession = () => {
+    createNewSession();
+    setStoreShowAbilityProfile(false);
+    setInterviewStartTime("");
+  };
+
+  const handleEditSession = async (sessionId: string, newTitle: string) => {
+    await updateSessionTitle(sessionId, newTitle);
+  };
+
+  const handleTogglePin = async (sessionId: string, pinned: boolean) => {
+    await togglePinSession(sessionId, pinned);
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowScrollButton(false);
+    setAutoScrollEnabled(true);
+  };
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
     // 距离底部 100px 以内视为在底部
@@ -142,13 +208,6 @@ export default function InterviewPage() {
     }
   };
 
-  // 滚动到底部
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    setShowScrollButton(false);
-    setAutoScrollEnabled(true);
-  };
-
   // 自动滚动效果
   useEffect(() => {
     if (autoScrollEnabled) {
@@ -156,162 +215,27 @@ export default function InterviewPage() {
     }
   }, [messages, autoScrollEnabled]);
 
-  const handleEditMessage = async (index: number, newContent: string) => {
-    if (isStreaming) return;
+  // 防止 Hydration 错误
+  if (!isMounted) return null;
 
-    // 回退到该消息之前的状态
-    await rollbackChat(index);
-
-    // 直接发送编辑后的消息
-    await sendMessage(newContent, threadId, jobDescription, companyInfo);
-  };
-
-  const handleRegenerateMessage = async (aiMessageIndex: number) => {
-    if (isStreaming) return;
-
-    // 特殊处理：如果是第一条消息（AI开场白），则重新开始面试流程
-    if (aiMessageIndex === 0) {
-      // 回退到空状态
-      await rollbackChat(0);
-      // 重新调用 startInterview 而不是发送空消息
-      if (resume) {
-        await startInterview(jobDescription, resume, threadId, companyInfo);
-      }
-      return;
-    }
-
-    // 找到对应的用户消息（AI消息的前一条应该是用户消息）
-    const userMessageIndex = aiMessageIndex - 1;
-    if (userMessageIndex < 0 || messages[userMessageIndex].role !== 'user') {
-      console.error('无法找到对应的用户消息');
-      return;
-    }
-
-    const userMessage = messages[userMessageIndex];
-
-    // 回退到用户消息之前的状态（删除用户消息和AI回复）
-    await rollbackChat(userMessageIndex);
-
-    // 重新发送原有的用户消息
-    await sendMessage(userMessage.content, threadId, jobDescription, companyInfo);
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      await uploadResume(e.target.files[0]);
-    }
-  };
-
-  const handleStartInterview = async () => {
-    if (resume && jobDescription.trim()) {
-      // 生成新的 thread_id
-      const newThreadId = uuidv4();
-      setThreadId(newThreadId);
-
-      // 1. 立即设置进度，解决顶部进度条不显示问题
-      setInterviewProgress({ current: 0, total: questionCount });
-
-      // 2. 手动设置当前会话，解决侧边栏不高亮问题
-      setCurrentSessionManual({
-        session_id: newThreadId,
-        title: "新模拟面试",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        metadata: {
-          mode: 'mock',
-          question_count: 0,
-          max_questions: questionCount,
-          status: 'active'
-        },
-        messages: []
-      });
-
-      // 启动面试流程（后端会自动创建会话并保存完整信息）
-      try {
-        await startInterview(jobDescription.trim(), resume, newThreadId, companyInfo.trim(), questionCount);
-
-        // 刷新会话列表以获取后端生成的最新会话
-        await fetchSessions('active', 'mock');
-      } catch (error) {
-        console.error('启动面试时出错:', error);
-      }
-    }
-  };
-
-  // 处理会话选择
-  const handleSessionSelect = async (sessionId: string) => {
-    const session = await fetchSession(sessionId);
-    if (session) {
-      setThreadId(session.session_id);
-      if (session.metadata.job_description) {
-        setJobDescription(session.metadata.job_description);
-      }
-
-      clearMessages();
-      restoreMessages(session.messages);
-
-      // 恢复面试进度
-      if (session.metadata.question_count !== undefined && session.metadata.max_questions !== undefined) {
-        setInterviewProgress({
-          current: session.metadata.question_count,
-          total: session.metadata.max_questions
-        });
-        setMaxQuestions(session.metadata.max_questions);
-      }
-
-      // 如果是移动端，选择后自动关闭侧边栏
-      if (window.innerWidth < 768) {
-        setShowSidebar(false);
-      }
-    }
-    // 确保关闭能力画像，返回聊天界面
-    setShowAbilityProfile(false);
-  };
-
-  // 处理新建会话
-  const handleNewSession = () => {
-    clearCurrentSession();
-    clearMessages();
-    setThreadId(uuidv4());
-    setJobDescription(""); // 重置岗位描述
-    setInterviewProgress(null);
-    // 确保关闭能力画像，返回聊天界面
-    setShowAbilityProfile(false);
-  };
-
-  // 处理编辑会话标题
-  const handleEditSession = async (sessionId: string, newTitle: string) => {
-    await updateSessionTitle(sessionId, newTitle);
-  };
-
-  // 处理置顶会话
-  const handleTogglePin = async (sessionId: string, pinned: boolean) => {
-    await togglePinSession(sessionId, pinned);
-  };
-
-  // 判断是否显示欢迎页（没有消息且没有当前会话，且不在流式传输中）
+  // 判断是否显示欢迎页
+  // 逻辑：没有消息且没有当前会话，且不在流式传输中
   const showWelcome = messages.length === 0 && !currentSession && !isStreaming;
+
+  // API 配置状态
+  const hasApiConfig = isConfigured();
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-white text-[#1d1d1f] font-sans antialiased">
 
-      {/* 左侧历史会话侧边栏 */}
+      {/* 侧边栏 */}
       <SessionSidebar
         isOpen={showSidebar}
         onClose={() => setShowSidebar(false)}
-        onSessionSelect={handleSessionSelect}
-        onNewSession={handleNewSession}
-        onShowAbilityProfile={() => setShowAbilityProfile(true)}
         onOpenSettings={() => setShowSettingsDialog(true)}
-        currentSessionId={currentSession?.session_id}
-        sessions={sessions}
-        onDeleteSession={deleteSession}
-        onEditSession={handleEditSession}
-        onTogglePin={handleTogglePin}
-        loading={sessionLoading}
       />
 
-      {/* 右侧主内容区域 */}
+      {/* 主内容区域 */}
       <main className="flex-1 flex flex-col h-full relative bg-white overflow-hidden">
 
         {/* 顶部导航栏 (仅在侧边栏关闭或移动端显示) */}
@@ -328,16 +252,16 @@ export default function InterviewPage() {
           </div>
         )}
 
-        {/* 如果显示能力画像 */}
+        {/* 视图切换逻辑 */}
         {showAbilityProfile ? (
+          // 能力画像视图
           <div className="flex-1 flex flex-col h-full relative">
-            {/* 顶部返回按钮 */}
             <div className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
               <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-4">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowAbilityProfile(false)}
+                  onClick={() => setStoreShowAbilityProfile(false)}
                   className="gap-2"
                 >
                   <X className="w-4 h-4" />
@@ -349,76 +273,88 @@ export default function InterviewPage() {
                 </div>
               </div>
             </div>
-            {/* 能力画像内容 */}
             <AbilityProfileView />
           </div>
         ) : showWelcome ? (
-          /* 欢迎页 / 新建会话页 */
+          // 欢迎页 / 配置页
           <div className="flex-1 flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 relative">
-            {/* ... (省略欢迎页内容，保持不变) ... */}
-            <div className="absolute top-8 left-8 flex items-center gap-4 z-10">
-              <div className="w-14 h-14 bg-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-teal-200">
-                <Bot className="w-7 h-7 text-white" />
+            {/* 背景装饰 */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-teal-50/50 via-white to-white pointer-events-none" />
+
+            <div className="w-full max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
+              {/* 左侧：介绍 */}
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center shadow-xl shadow-teal-200 mb-6">
+                    <Bot className="w-8 h-8 text-white" />
+                  </div>
+                  <h1 className="text-4xl font-bold tracking-tight text-gray-900 leading-tight">
+                    AI 模拟面试<br />
+                    <span className="text-teal-600">助你拿到 Offer</span>
+                  </h1>
+                  <p className="text-lg text-gray-500 leading-relaxed max-w-md">
+                    上传简历，粘贴职位描述，立即开始一场真实的模拟面试。获取实时反馈，提升面试技巧。
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center mb-3">
+                      <Bot className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900 mb-1">智能追问</h3>
+                    <p className="text-sm text-gray-500">基于上下文的深度追问</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+                    <div className="w-8 h-8 rounded-lg bg-pink-100 flex items-center justify-center mb-3">
+                      <Award className="w-4 h-4 text-pink-600" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900 mb-1">能力评估</h3>
+                    <p className="text-sm text-gray-500">多维度的能力画像分析</p>
+                  </div>
+                </div>
               </div>
-              <div className="text-left">
-                <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-                  面试<span className="text-teal-600">.AI</span>
-                </h1>
-                <p className="text-sm text-gray-500 max-w-md">
-                  您的智能面试教练。
-                </p>
-              </div>
-            </div>
 
-            <div className="max-w-2xl w-full text-center mt-16">
-
-              {/* 核心操作区域 */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-6 text-left">
-
+              {/* 右侧：配置表单 */}
+              <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 space-y-8">
                 {/* 1. 上传简历 */}
                 <div className="space-y-3">
                   <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                     <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-100 text-teal-600 text-xs font-bold">1</span>
-                    上传简历
+                    上传简历 (PDF/Word)
                   </label>
-
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept=".pdf,.txt,.md"
-                    onChange={handleFileUpload}
-                  />
-
-                  {!resume ? (
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center justify-center gap-2 hover:border-teal-500 hover:bg-teal-50/50 transition-all cursor-pointer group"
-                    >
-                      <div className="p-3 bg-gray-50 rounded-full group-hover:bg-teal-100 transition-colors">
-                        {isLoading ? <Loader2 className="w-6 h-6 text-teal-600 animate-spin" /> : <Upload className="w-6 h-6 text-gray-400 group-hover:text-teal-600" />}
-                      </div>
-                      <p className="text-sm text-gray-500 font-medium">点击上传 PDF 、Word 或 TXT 简历</p>
+                  <div className="relative group">
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.txt,.md"
+                      onChange={handleFileUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div className={cn(
+                      "w-full h-14 rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all",
+                      resume
+                        ? "border-teal-200 bg-teal-50 text-teal-700"
+                        : "border-gray-200 bg-gray-50 text-gray-400 group-hover:border-teal-300 group-hover:bg-teal-50/30"
+                    )}>
+                      {isLoading ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : resume ? (
+                        <>
+                          <FileText className="w-5 h-5" />
+                          <span className="font-medium truncate max-w-[200px]">{resume.original_name}</span>
+                          <span className="text-xs bg-teal-200/50 px-2 py-0.5 rounded-full">已上传</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-5 h-5" />
+                          <span className="font-medium">点击上传简历</span>
+                        </>
+                      )}
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-between p-4 bg-teal-50 border border-teal-100 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-teal-100 rounded-lg">
-                          <FileText className="w-5 h-5 text-teal-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{resume.original_name}</p>
-                          <p className="text-xs text-teal-600">已就绪</p>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} className="text-gray-400 hover:text-teal-600">
-                        更换
-                      </Button>
-                    </div>
-                  )}
+                  </div>
                 </div>
 
-                {/* 2. 输入岗位描述 (修改为点击弹窗编辑) */}
+                {/* 2. 职位描述 - 点击弹窗编辑 */}
                 <div className="space-y-3">
                   <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                     <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-100 text-teal-600 text-xs font-bold">2</span>
@@ -435,7 +371,7 @@ export default function InterviewPage() {
                     <div className={cn(
                       "w-full rounded-xl border border-gray-200 bg-white p-4 text-sm transition-all",
                       "hover:border-teal-500 hover:ring-2 hover:ring-teal-50",
-                      "min-h-[100px] max-h-[100px] overflow-hidden relative" // 固定高度
+                      "min-h-[100px] max-h-[100px] overflow-hidden relative"
                     )}>
                       {jobDescription ? (
                         <p className="text-gray-700 whitespace-pre-wrap line-clamp-3">{jobDescription}</p>
@@ -443,7 +379,7 @@ export default function InterviewPage() {
                         <p className="text-gray-400">例如：高级Java工程师，要求熟悉Spring Boot和微服务架构...</p>
                       )}
 
-                      {/* 遮罩和图标 */}
+                      {/* 悬停遮罩和提示 */}
                       <div className="absolute inset-0 bg-gradient-to-t from-white/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2">
                         <span className="text-teal-600 font-medium flex items-center gap-1 bg-white/90 px-3 py-1 rounded-full shadow-sm text-xs">
                           <Maximize2 className="w-3 h-3" /> 点击展开编辑
@@ -453,7 +389,7 @@ export default function InterviewPage() {
                   </div>
                 </div>
 
-                {/* 2.5. 输入公司信息 (非必填) */}
+                {/* 2.5. 公司信息 (选填) */}
                 <div className="space-y-3">
                   <label className="text-sm font-medium text-gray-500 flex items-center gap-2">
                     <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">选填</span>
@@ -465,7 +401,7 @@ export default function InterviewPage() {
                     value={companyInfo}
                     onChange={(e) => setCompanyInfo(e.target.value)}
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm transition-all hover:border-teal-500 hover:ring-2 hover:ring-teal-50 focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none"
-                    placeholder="例如：大厂、创业公司、外企等（也可填主要业务、规模大小）"
+                    placeholder="大厂、创业公司、外企等（主要业务、规模大小）"
                   />
                   <p className="text-xs text-gray-400">
                     提供公司信息可以让面试题目更贴近实际场景
@@ -485,12 +421,12 @@ export default function InterviewPage() {
                       min="3"
                       max="10"
                       step="1"
-                      value={questionCount}
-                      onChange={(e) => setQuestionCount(parseInt(e.target.value))}
+                      value={maxQuestions}
+                      onChange={(e) => setMaxQuestions(parseInt(e.target.value))}
                       className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
                     />
                     <div className="w-12 h-10 flex items-center justify-center bg-teal-50 border border-teal-100 rounded-lg text-teal-700 font-semibold">
-                      {questionCount}
+                      {maxQuestions}
                     </div>
                   </div>
                   <p className="text-xs text-gray-400">
@@ -499,7 +435,7 @@ export default function InterviewPage() {
                 </div>
 
                 {/* API 配置提示 */}
-                {!isConfigured && (
+                {!hasApiConfig && (
                   <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
@@ -523,7 +459,7 @@ export default function InterviewPage() {
                 <Button
                   className="w-full h-12 text-base font-medium bg-teal-600 hover:bg-teal-700 shadow-lg shadow-teal-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleStartInterview}
-                  disabled={!resume || !jobDescription.trim() || isLoading || !isConfigured}
+                  disabled={!resume || !jobDescription.trim() || isLoading || !hasApiConfig}
                 >
                   {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Sparkles className="mr-2 h-5 w-5" />}
                   开始面试
@@ -533,10 +469,10 @@ export default function InterviewPage() {
             </div>
           </div>
         ) : (
-          /* 聊天界面 */
-          <>
-            {/* 面试进度条 */}
-            {interviewProgress && interviewProgress.total > 0 && (
+          // 聊天界面
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
+            {/* 面试进度条 - 仅在有消息时显示 */}
+            {interviewProgress && interviewProgress.total > 0 && messages.length > 0 && (
               <div className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
                 <div className="max-w-3xl mx-auto px-6 py-3">
                   <div className="flex items-center justify-between text-sm">
@@ -550,152 +486,153 @@ export default function InterviewPage() {
                           {interviewProgress.current >= interviewProgress.total ? "面试已完成" : "面试进行中"}
                         </span>
                       </div>
-                      <span className="text-gray-400">·</span>
+                      <span className="text-gray-300">|</span>
                       <span className="text-gray-500">
-                        问题 <span className="font-semibold text-teal-600">{interviewProgress.current}</span>
-                        <span className="text-gray-400 mx-1">/</span>
-                        <span className="font-semibold text-gray-700">{interviewProgress.total}</span>
+                        问题 {Math.min(interviewProgress.current + 1, interviewProgress.total)} / {interviewProgress.total}
                       </span>
                     </div>
-
-                    {/* 进度条 */}
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-teal-500 to-teal-600 rounded-full transition-all duration-500 ease-out"
-                          style={{ width: `${(interviewProgress.current / interviewProgress.total) * 100}%` }}
-                        ></div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1.5 text-gray-500">
+                        <Timer className="w-4 h-4" />
+                        <span>{interviewStartTime || '--:--'}</span>
                       </div>
-                      <span className="text-xs font-medium text-gray-400">
-                        {Math.round((interviewProgress.current / interviewProgress.total) * 100)}%
-                      </span>
                     </div>
+                  </div>
+                  {/* 进度条 */}
+                  <div className="mt-3 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-teal-500 rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${(interviewProgress.current / interviewProgress.total) * 100}%` }}
+                    />
                   </div>
                 </div>
               </div>
             )}
 
-            <ScrollArea
-              className="flex-1 w-full min-h-0 overflow-hidden"
-              viewportRef={scrollViewportRef}
-              onScroll={handleScroll}
-            >
-              <div className="max-w-3xl mx-auto px-4 pt-10 pb-4 space-y-6">
-                {messages.map((m, i) => (
-                  <ChatMessage
-                    key={i}
-                    {...m}
-                    onEdit={m.role === 'user' ? (content) => handleEditMessage(i, content) : undefined}
-                    onRegenerate={m.role === 'ai' ? () => handleRegenerateMessage(i) : undefined}
-                  />
-                ))}
-
-                {/* 初始加载状态：当正在加载或流式传输且没有消息时显示 */}
-                {(isLoading || isStreaming) && messages.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-20 space-y-4 animate-in fade-in duration-500">
-                    <div className="relative">
-                      <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center">
-                        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+            {/* 聊天区域 */}
+            <div className="flex-1 overflow-hidden relative flex flex-col">
+              <ScrollArea className="flex-1 px-4 overflow-hidden" viewportRef={scrollViewportRef} onScroll={handleScroll}>
+                <div className="max-w-3xl mx-auto py-6 space-y-6">
+                  {/* 初始加载状态：当正在加载或流式传输且没有消息时显示 */}
+                  {(isLoading || isStreaming) && messages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-20 space-y-4 animate-in fade-in duration-500">
+                      <div className="relative">
+                        <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center">
+                          <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm">
+                          <Bot className="w-4 h-4 text-teal-600" />
+                        </div>
                       </div>
-                      <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm">
-                        <Bot className="w-4 h-4 text-teal-600" />
+                      <div className="text-center space-y-2">
+                        <h3 className="text-lg font-medium text-gray-900">正在为您准备面试...</h3>
+                        <p className="text-sm text-gray-500 max-w-xs mx-auto">
+                          AI 面试官正在阅读您的简历并生成个性化问题，请稍候。
+                        </p>
                       </div>
                     </div>
-                    <div className="text-center space-y-2">
-                      <h3 className="text-lg font-medium text-gray-900">正在为您准备面试...</h3>
-                      <p className="text-sm text-gray-500 max-w-xs mx-auto">
-                        AI 面试官正在阅读您的简历并生成个性化问题，请稍候。
-                      </p>
+                  )}
+
+                  {messages.map((msg, index) => (
+                    <ChatMessage
+                      key={index}
+                      role={msg.role}
+                      content={msg.content}
+                      timestamp={msg.timestamp}
+                      onEdit={msg.role === 'user' ? (content) => handleEditMessage(index, content) : undefined}
+                      onRegenerate={msg.role === 'ai' ? () => handleRegenerateMessage(index) : undefined}
+                    />
+                  ))}
+
+                  {/* 后续对话的思考状态：仅在流式传输中且最后一条消息是用户消息时显示 */}
+                  {isStreaming && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
+                    <div className="flex items-center gap-2 text-gray-400 text-sm px-4 animate-pulse">
+                      <Bot className="w-4 h-4" />
+                      <span>面试官正在思考...</span>
                     </div>
-                  </div>
-                )}
+                  )}
+                  {/* 底部留白 */}
+                  <div className="h-4" />
+                  <div ref={messagesEndRef} />
+                </div>
+              </ScrollArea>
 
-                {/* 常规思考状态：只有在已有消息的情况下显示 */}
-                {isStreaming && messages.length > 0 && messages[messages.length - 1]?.role !== 'ai' && (
-                  <div className="flex items-center gap-2 text-gray-400 text-sm pl-4">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    AI 正在思考...
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            </ScrollArea>
+              {/* 输入区域 */}
+              <div className="relative w-full bg-white border-t border-gray-100 px-6 py-4 z-20">
+                <div className="max-w-3xl mx-auto relative">
+                  {/* 跳转到底部按钮 - 移动到输入框上方 */}
+                  {showScrollButton && (
+                    <div className="absolute -top-12 left-0 right-0 flex justify-center z-20 pointer-events-none">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="rounded-full shadow-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 gap-2 pointer-events-auto animate-in fade-in zoom-in duration-300"
+                        onClick={scrollToBottom}
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                        <span>回到底部</span>
+                      </Button>
+                    </div>
+                  )}
 
-            {/* 底部输入框 */}
-            <div className="relative w-full bg-white border-t border-gray-100 px-6 py-4 z-20">
-              <div className="max-w-3xl mx-auto relative">
-                {/* 跳转到底部按钮 - 移动到输入框上方 */}
-                {showScrollButton && (
-                  <div className="absolute -top-12 left-0 right-0 flex justify-center z-20 pointer-events-none">
+                  <div className="relative bg-white rounded-2xl shadow-sm border border-gray-200 focus-within:ring-2 focus-within:ring-teal-100 transition-all">
+                    <Textarea
+                      placeholder="输入您的回答..."
+                      className="min-h-[120px] max-h-[400px] w-full resize-none border-0 bg-transparent focus-visible:ring-0 p-5 pr-14 text-base leading-relaxed"
+                      value={input}
+                      onChange={e => setInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                      disabled={isStreaming}
+                    />
                     <Button
-                      size="sm"
-                      variant="secondary"
-                      className="rounded-full shadow-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 gap-2 pointer-events-auto animate-in fade-in zoom-in duration-300"
-                      onClick={scrollToBottom}
+                      size="icon"
+                      variant="ghost"
+                      className={cn(
+                        "absolute right-14 bottom-2 h-9 w-9 transition-all hover:bg-gray-100 text-gray-400",
+                        isListening && "text-red-500 hover:text-red-600 hover:bg-red-50 animate-pulse"
+                      )}
+                      onClick={toggleListening}
+                      title={isListening ? "停止录音" : "语音输入"}
                     >
-                      <ArrowDown className="w-4 h-4" />
-                      <span>回到底部</span>
+                      <Mic className="h-5 w-5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      className={cn(
+                        "absolute right-2 bottom-2 h-9 w-9 transition-all",
+                        isStreaming || input.trim()
+                          ? "bg-teal-600 hover:bg-teal-700"
+                          : "bg-gray-100 text-gray-400"
+                      )}
+                      onClick={isStreaming ? stopStreaming : handleSend}
+                      disabled={!isStreaming && !input.trim()}
+                    >
+                      {isStreaming ? (
+                        <Square className="h-4 w-4" fill="currentColor" />
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                      <span className="sr-only">{isStreaming ? '暂停' : '发送'}</span>
                     </Button>
                   </div>
-                )}
-
-                <div className="relative bg-white rounded-2xl shadow-sm border border-gray-200 focus-within:ring-2 focus-within:ring-teal-100 transition-all">
-                  <Textarea
-                    placeholder="输入您的回答..."
-                    className="min-h-[120px] max-h-[400px] w-full resize-none border-0 bg-transparent focus-visible:ring-0 p-5 pr-14 text-base leading-relaxed"
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
-                    disabled={isStreaming}
-                  />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className={cn(
-                      "absolute right-14 bottom-2 h-9 w-9 transition-all hover:bg-gray-100 text-gray-400",
-                      isListening && "text-red-500 hover:text-red-600 hover:bg-red-50 animate-pulse"
-                    )}
-                    onClick={toggleListening}
-                    title={isListening ? "停止录音" : "语音输入"}
-                  >
-                    <Mic className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    className={cn(
-                      "absolute right-2 bottom-2 h-9 w-9 transition-all",
-                      isStreaming || input.trim()
-                        ? "bg-teal-600 hover:bg-teal-700"
-                        : "bg-gray-100 text-gray-400"
-                    )}
-                    onClick={isStreaming ? stopStreaming : handleSend}
-                    disabled={!isStreaming && !input.trim()}
-                  >
-                    {isStreaming ? (
-                      <Square className="h-4 w-4" fill="currentColor" />
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                    <span className="sr-only">{isStreaming ? '暂停' : '发送'}</span>
-                  </Button>
+                  <p className="text-center text-xs text-gray-400 mt-3">
+                    AI 生成内容可能不准确，请核实重要信息。
+                  </p>
                 </div>
-                <p className="text-center text-xs text-gray-400 mt-3">
-                  AI 生成内容可能不准确，请核实重要信息。
-                </p>
               </div>
             </div>
-          </>
+          </div>
         )}
       </main>
 
-      {/* 岗位描述编辑弹窗 */}
+      {/* 职位描述编辑弹窗 */}
       <Dialog open={isJobDialogOpen} onOpenChange={setIsJobDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
@@ -726,12 +663,6 @@ export default function InterviewPage() {
       <SettingsDialog
         open={showSettingsDialog}
         onOpenChange={setShowSettingsDialog}
-        config={apiConfig}
-        onAddModel={addModel}
-        onUpdateModel={updateModel}
-        onDeleteModel={deleteModel}
-        onSetSmartModel={setSmartModel}
-        onSetFastModel={setFastModel}
       />
     </div>
   );

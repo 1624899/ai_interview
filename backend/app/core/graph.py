@@ -185,7 +185,7 @@ async def node_responder(state: InterviewState):
     if turn_phase == "opening":
         current_question = plan[idx]["content"]
         
-        prompt = f"""你是一位专业的技术面试官。请直接向候选人提出以下问题。
+        prompt = f"""你是一位专业的技术面试官。请输出“你好我是你的面试官”并直接向候选人提出以下问题。
         
         问题：{current_question}
         """
@@ -318,15 +318,6 @@ async def _trigger_background_analysis(state):
         
         logger.info(f"[AnalysisService] 会话 {session_id} 的画像分析已完成")
         
-        # 触发分析后，使能力画像缓存失效，以便下次获取最新数据
-        try:
-            from app.services.ability_service import get_ability_service
-            # 注意：这里假设 ability_service 有 invalidate_cache 方法，或者我们不需要显式失效
-            # 因为 AbilityAnalysisService 是基于数据库读取的，只要 session_service 更新了，它就能读到
-            pass
-        except Exception:
-            pass
-        
     except Exception as e:
         logger.error(f"后台分析触发失败: {str(e)}", exc_info=True)
 
@@ -354,7 +345,11 @@ async def node_summary(state: InterviewState):
     # ==========================================
     asyncio.create_task(_trigger_background_analysis(state))
     
-    return {"messages": [response]}
+    return {
+        "messages": [response],
+        "question_count": state.get("question_count"),
+        "max_questions": state.get("max_questions")
+    }
 
 
 # ============================================================================

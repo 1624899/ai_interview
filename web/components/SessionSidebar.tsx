@@ -4,37 +4,45 @@ import { Button } from '@/components/ui/button';
 import { SessionList } from './SessionList';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { SessionListItem } from '@/hooks/useSessionManagement';
+import { useInterviewStore } from '@/store/useInterviewStore';
 
 interface SessionSidebarProps {
     isOpen: boolean;
     onClose: () => void;
-    onSessionSelect: (sessionId: string) => void;
-    onNewSession: () => void;
-    onShowAbilityProfile?: () => void; // 新增：显示能力画像的回调
-    onOpenSettings?: () => void; // 新增：打开设置的回调
-    currentSessionId?: string;
-    sessions: SessionListItem[];
-    onDeleteSession: (sessionId: string) => void;
-    onEditSession?: (sessionId: string, newTitle: string) => void;
-    onTogglePin?: (sessionId: string, pinned: boolean) => void;
-    loading?: boolean;
+    onOpenSettings: () => void;
 }
 
 export function SessionSidebar({
     isOpen,
     onClose,
-    onSessionSelect,
-    onNewSession,
-    onShowAbilityProfile,
-    onOpenSettings,
-    currentSessionId,
-    sessions,
-    onDeleteSession,
-    onEditSession,
-    onTogglePin,
-    loading
+    onOpenSettings
 }: SessionSidebarProps) {
+    const {
+        sessions,
+        currentSession,
+        sessionLoading,
+        selectSession,
+        createNewSession,
+        deleteSession,
+        updateSessionTitle,
+        togglePinSession,
+        setShowAbilityProfile
+    } = useInterviewStore();
+
+    const handleSessionSelect = (sessionId: string) => {
+        selectSession(sessionId);
+        if (window.innerWidth < 768) {
+            onClose();
+        }
+    };
+
+    const handleNewSession = () => {
+        createNewSession();
+        if (window.innerWidth < 768) {
+            onClose();
+        }
+    };
+
     return (
         <AnimatePresence mode="wait">
             {isOpen && (
@@ -77,7 +85,7 @@ export function SessionSidebar({
                         {/* 2. 新建按钮 */}
                         <div className="px-4 pb-4">
                             <Button
-                                onClick={onNewSession}
+                                onClick={handleNewSession}
                                 variant="ghost"
                                 className={cn(
                                     "w-full justify-start gap-3 h-11 rounded-xl bg-[#E0F2F1] hover:bg-[#B2DFDB]",
@@ -98,53 +106,49 @@ export function SessionSidebar({
                     <div className="flex-1 overflow-hidden px-4 py-2">
                         <SessionList
                             sessions={sessions}
-                            onSessionSelect={onSessionSelect}
-                            onDeleteSession={onDeleteSession}
-                            onEditSession={onEditSession}
-                            onTogglePin={onTogglePin}
-                            currentSessionId={currentSessionId}
-                            loading={loading}
+                            onSessionSelect={handleSessionSelect}
+                            onDeleteSession={deleteSession}
+                            onEditSession={updateSessionTitle}
+                            onTogglePin={togglePinSession}
+                            currentSessionId={currentSession?.session_id}
+                            loading={sessionLoading}
                         />
                     </div>
 
-                    {/* 底部能力评分按钮 */}
-                    {onShowAbilityProfile && (
-                        <div className="p-4 border-t border-gray-100 bg-[#F9F9F9]">
-                            <Button
-                                onClick={onShowAbilityProfile}
-                                variant="ghost"
-                                className={cn(
-                                    "w-full justify-start gap-3 h-11 rounded-xl",
-                                    "bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100",
-                                    "hover:from-gray-200 hover:via-gray-300 hover:to-gray-200",
-                                    "text-gray-700 hover:text-gray-900",
-                                    "border border-gray-300/50",
-                                    "shadow-sm hover:shadow-md",
-                                    "transition-all px-4"
-                                )}
-                            >
-                                <Award className="w-5 h-5 text-amber-500" strokeWidth={2.5} />
-                                <span className="text-[15px] font-semibold tracking-wide">能力评分</span>
-                            </Button>
-                        </div>
-                    )}
-
-                    {/* 底部用户信息与设置区域 */}
-                    <div className="p-4 border-t border-gray-100 bg-[#F9F9F9]">
-                        <div
-                            onClick={onOpenSettings}
-                            className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm cursor-pointer transition-all group border border-transparent hover:border-gray-100"
+                    {/* 底部设置区域 */}
+                    <div className="p-4 border-t border-gray-200 space-y-2">
+                        {/* 能力画像入口 */}
+                        <Button
+                            variant="ghost"
+                            className="w-full justify-start gap-3 h-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white via-gray-100 to-gray-300 border border-gray-200 text-gray-700 hover:from-gray-50 hover:to-gray-400 hover:text-gray-900 shadow-sm transition-all"
+                            onClick={() => {
+                                setShowAbilityProfile(true);
+                                if (window.innerWidth < 768) onClose();
+                            }}
                         >
-                            <Avatar className="h-9 w-9 border border-gray-200">
-                                <AvatarFallback className="bg-teal-50 text-teal-600">
-                                    <User className="w-5 h-5" />
-                                </AvatarFallback>
+                            <Award className="w-4 h-4 text-pink-500" />
+                            <span className="text-sm font-medium">能力画像</span>
+                        </Button>
+
+                        {/* 设置入口 */}
+                        <Button
+                            variant="ghost"
+                            className="w-full justify-start gap-3 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            onClick={onOpenSettings}
+                        >
+                            <Settings className="w-4 h-4" />
+                            <span className="text-sm font-medium">设置</span>
+                        </Button>
+
+                        {/* 用户信息 */}
+                        <div className="flex items-center gap-3 px-2 py-2">
+                            <Avatar className="h-8 w-8 bg-teal-100 flex items-center justify-center">
+                                <User className="w-5 h-5 text-teal-700" />
                             </Avatar>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">设置</p>
-                                <p className="text-xs text-gray-500 truncate">配置 API Key</p>
+                                <p className="text-sm font-medium text-gray-900 truncate">面试候选人</p>
+                                <p className="text-xs text-gray-500 truncate">Pro Plan</p>
                             </div>
-                            <Settings className="w-4 h-4 text-gray-400 group-hover:text-teal-600 transition-colors" />
                         </div>
                     </div>
                 </motion.aside>

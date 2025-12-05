@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 interface ChatMessageProps {
     role: 'user' | 'ai' | 'system'; // 消息角色：用户、AI或系统
     content: string; // 消息内容
+    timestamp?: string; // 消息时间戳
     isStreaming?: boolean; // 是否正在流式传输
     onEdit?: (content: string) => void;
     onCancelEdit?: () => void;
@@ -21,7 +22,7 @@ import { User, Bot, Copy, Pencil, Check, X, RefreshCw } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 
-export function ChatMessage({ role, content, isStreaming, onEdit, onCancelEdit, onRegenerate }: ChatMessageProps) {
+export function ChatMessage({ role, content, timestamp, isStreaming, onEdit, onCancelEdit, onRegenerate }: ChatMessageProps) {
     const isUser = role === 'user';
     const [isCopied, setIsCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);

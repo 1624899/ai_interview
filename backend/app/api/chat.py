@@ -312,7 +312,7 @@ async def event_generator(graph, inputs, config, thread_id: str, user_message: s
                             type="state_update",
                             content=json.dumps({
                                 "question_count": output["question_count"],
-                                "max_questions": output.get("max_questions", 5)
+                                "max_questions": output.get("max_questions", inputs.get("max_questions", 5))
                             })
                         )
                         yield f"data: {response.model_dump_json()}\n\n"

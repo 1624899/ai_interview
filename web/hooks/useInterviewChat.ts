@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { getApiConfig, ApiConfig } from './useApiConfig';
+import { getUserId } from './useUserIdentity';
 
 // 消息角色类型
 export type Role = 'user' | 'ai' | 'system';
@@ -67,7 +68,10 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
 
             const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User-ID': getUserId()
+                },
                 body: JSON.stringify({
                     thread_id: currentThreadId,
                     message: content,
@@ -191,7 +195,10 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
 
             const response = await fetch(`${API_BASE_URL}/api/chat/start`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User-ID': getUserId()
+                },
                 body: JSON.stringify({
                     thread_id: currentThreadId,
                     resume_context: currentResume.content,
@@ -250,6 +257,9 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
         try {
             const response = await fetch(`${API_BASE_URL}/api/upload/resume`, {
                 method: 'POST',
+                headers: {
+                    'X-User-ID': getUserId()
+                },
                 body: formData
             });
 
@@ -295,7 +305,10 @@ export function useInterviewChat({ }: UseInterviewChatProps = {}) {
             // 前端现在显示所有消息，索引与后端一致，无需调整
             const response = await fetch(`${API_BASE_URL}/api/chat/rollback`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User-ID': getUserId()
+                },
                 body: JSON.stringify({
                     thread_id: threadId,
                     index: index

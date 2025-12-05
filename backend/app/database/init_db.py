@@ -27,6 +27,7 @@ def init_database():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS sessions (
                 session_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL DEFAULT 'default_user',
                 title TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -96,6 +97,11 @@ def init_database():
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_session_pinned 
             ON sessions(pinned DESC, updated_at DESC)
+        ''')
+
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_session_user 
+            ON sessions(user_id)
         ''')
         
         # 消息表索引

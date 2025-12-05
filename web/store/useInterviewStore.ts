@@ -11,6 +11,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
+import { getUserId } from '@/hooks/useUserIdentity';
 
 // ============================================================================
 // 类型定义
@@ -216,7 +217,9 @@ export const useInterviewStore = create<InterviewStore>()(
                     if (mode) params.append('mode', mode);
                     params.append('limit', '50');
 
-                    const response = await fetch(`${API_BASE_URL}/api/sessions/?${params}`);
+                    const response = await fetch(`${API_BASE_URL}/api/sessions/?${params}`, {
+                        headers: { 'X-User-ID': getUserId() }
+                    });
                     if (!response.ok) throw new Error('获取会话列表失败');
 
                     const data = await response.json();
@@ -231,7 +234,9 @@ export const useInterviewStore = create<InterviewStore>()(
             selectSession: async (sessionId: string) => {
                 set({ sessionLoading: true });
                 try {
-                    const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`);
+                    const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+                        headers: { 'X-User-ID': getUserId() }
+                    });
                     if (!response.ok) throw new Error('获取会话详情失败');
 
                     const data = await response.json();
@@ -274,6 +279,7 @@ export const useInterviewStore = create<InterviewStore>()(
                 try {
                     const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
                         method: 'DELETE',
+                        headers: { 'X-User-ID': getUserId() }
                     });
                     if (!response.ok) throw new Error('删除会话失败');
 
@@ -293,7 +299,10 @@ export const useInterviewStore = create<InterviewStore>()(
                 try {
                     const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
                         method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-User-ID': getUserId()
+                        },
                         body: JSON.stringify({ title }),
                     });
                     if (!response.ok) throw new Error('更新标题失败');
@@ -318,7 +327,10 @@ export const useInterviewStore = create<InterviewStore>()(
                 try {
                     const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
                         method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-User-ID': getUserId()
+                        },
                         body: JSON.stringify({ metadata: { pinned } }),
                     });
                     if (!response.ok) throw new Error('更新置顶状态失败');
@@ -351,6 +363,7 @@ export const useInterviewStore = create<InterviewStore>()(
 
                     const response = await fetch(`${API_BASE_URL}/api/upload/resume`, {
                         method: 'POST',
+                        headers: { 'X-User-ID': getUserId() },
                         body: formData,
                     });
 
@@ -426,7 +439,10 @@ export const useInterviewStore = create<InterviewStore>()(
                 try {
                     const response = await fetch(`${API_BASE_URL}/api/chat/start`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-User-ID': getUserId()
+                        },
                         body: JSON.stringify(requestBody),
                         signal: abortController.signal,
                     });
@@ -610,7 +626,10 @@ export const useInterviewStore = create<InterviewStore>()(
                 try {
                     const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-User-ID': getUserId()
+                        },
                         body: JSON.stringify({
                             thread_id: threadId,
                             message: content,
@@ -710,7 +729,10 @@ export const useInterviewStore = create<InterviewStore>()(
                 try {
                     const response = await fetch(`${API_BASE_URL}/api/chat/rollback`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-User-ID': getUserId()
+                        },
                         body: JSON.stringify({
                             thread_id: threadId,
                             index: toIndex,

@@ -5,7 +5,7 @@
 
 import logging
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Header
 from fastapi.responses import JSONResponse
 
 from app.models.session import (
@@ -26,7 +26,10 @@ session_service = SessionService()
 
 
 @router.post("/", response_model=SessionDetailResponse)
-async def create_session(request: SessionCreateRequest):
+async def create_session(
+    request: SessionCreateRequest,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
     """
     创建新的面试会话
     
@@ -48,7 +51,8 @@ async def create_session(request: SessionCreateRequest):
             title=request.title,
             resume_filename=request.resume_filename,
             job_description=request.job_description,
-            max_questions=request.max_questions
+            max_questions=request.max_questions,
+            user_id=request.user_id or x_user_id or "default_user"
         )
         
         return SessionDetailResponse(
@@ -72,7 +76,8 @@ async def list_sessions(
     status: Optional[str] = Query(None, description="筛选状态: active, completed, archived"),
     mode: Optional[str] = Query(None, description="筛选模式: mock"),
     limit: Optional[int] = Query(50, description="返回数量限制"),
-    offset: int = Query(0, description="偏移量")
+    offset: int = Query(0, description="偏移量"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
 ):
     """
     获取会话列表
@@ -91,10 +96,11 @@ async def list_sessions(
             status=status,
             mode=mode,
             limit=limit,
-            offset=offset
+            offset=offset,
+            user_id=x_user_id
         )
         
-        total = await session_service.get_session_count(status=status)
+        total = await session_service.get_session_count(status=status, user_id=x_user_id)
         
         return SessionListResponse(
             success=True,
@@ -114,7 +120,10 @@ async def list_sessions(
 
 
 @router.get("/{session_id}", response_model=SessionDetailResponse)
-async def get_session(session_id: str):
+async def get_session(
+    session_id: str,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
     """
     获取会话详情
     
@@ -125,7 +134,7 @@ async def get_session(session_id: str):
         SessionDetailResponse: 会话详情
     """
     try:
-        session = await session_service.get_session(session_id)
+        session = await session_service.get_session(session_id, user_id=x_user_id)
         
         if session is None:
             raise HTTPException(
@@ -155,7 +164,11 @@ async def get_session(session_id: str):
 
 
 @router.patch("/{session_id}", response_model=SessionDetailResponse)
-async def update_session(session_id: str, request: SessionUpdateRequest):
+async def update_session(
+    session_id: str, 
+    request: SessionUpdateRequest,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
     """
     更新会话信息
     
@@ -171,7 +184,8 @@ async def update_session(session_id: str, request: SessionUpdateRequest):
             session_id=session_id,
             title=request.title,
             status=request.status,
-            metadata_updates=request.metadata
+            metadata_updates=request.metadata,
+            user_id=x_user_id
         )
         
         if session is None:
@@ -202,7 +216,10 @@ async def update_session(session_id: str, request: SessionUpdateRequest):
 
 
 @router.delete("/{session_id}")
-async def delete_session(session_id: str):
+async def delete_session(
+    session_id: str,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
     """
     删除会话
     
@@ -213,7 +230,7 @@ async def delete_session(session_id: str):
         dict: 删除结果
     """
     try:
-        success = await session_service.delete_session(session_id)
+        success = await session_service.delete_session(session_id, user_id=x_user_id)
         
         if not success:
             raise HTTPException(
@@ -246,7 +263,8 @@ async def delete_session(session_id: str):
 async def add_message_to_session(
     session_id: str,
     role: str,
-    content: str
+    content: str,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
 ):
     """
     向会话添加消息
@@ -263,7 +281,8 @@ async def add_message_to_session(
         session = await session_service.add_message(
             session_id=session_id,
             role=role,
-            content=content
+            content=content,
+            user_id=x_user_id
         )
         
         if session is None:

@@ -42,7 +42,8 @@ class SessionService:
         resume_content: Optional[str] = None,
         job_description: Optional[str] = None,
         company_info: Optional[str] = None,
-        max_questions: int = 5
+        max_questions: int = 5,
+        user_id: str = "default_user"
     ) -> InterviewSession:
         """
         创建新会话（异步）
@@ -55,7 +56,9 @@ class SessionService:
             resume_content: 简历全文内容
             job_description: 岗位描述
             company_info: 公司信息
+            company_info: 公司信息
             max_questions: 最大问题数
+            user_id: 用户ID
             
         Returns:
             InterviewSession: 创建的会话对象
@@ -74,12 +77,12 @@ class SessionService:
             try:
                 await db.execute('''
                     INSERT INTO sessions (
-                        session_id, title, created_at, updated_at, mode,
+                        session_id, user_id, title, created_at, updated_at, mode,
                         resume_filename, resume_content, job_description, company_info,
                         question_count, max_questions, status, pinned
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    session_id, title, now, now, mode,
+                    session_id, user_id, title, now, now, mode,
                     resume_filename, resume_content, job_description, company_info,
                     0, max_questions, 'active', 0
                 ))
@@ -92,13 +95,15 @@ class SessionService:
                 logger.error(f"会话已存在: {session_id}")
                 raise ValueError(f"会话 {session_id} 已存在")
     
-    async def get_session(self, session_id: str, include_resume_content: bool = False) -> Optional[InterviewSession]:
+    async def get_session(self, session_id: str, include_resume_content: bool = False, user_id: Optional[str] = None) -> Optional[InterviewSession]:
         """
         获取会话详情（异步）
         
         Args:
             session_id: 会话ID
+            session_id: 会话ID
             include_resume_content: 是否包含简历全文（默认False，优化性能）
+            user_id: 用户ID（可选，用于权限校验）
             
         Returns:
             InterviewSession: 会话对象，不存在则返回None
@@ -117,7 +122,14 @@ class SessionService:
             select_clause = ", ".join(columns)
             
             # 获取会话基本信息
-            async with db.execute(f'SELECT {select_clause} FROM sessions WHERE session_id = ?', (session_id,)) as cursor:
+            sql = f'SELECT {select_clause} FROM sessions WHERE session_id = ?'
+            params = [session_id]
+            
+            if user_id:
+                sql += ' AND user_id = ?'
+                params.append(user_id)
+                
+            async with db.execute(sql, params) as cursor:
                 row = await cursor.fetchone()
                 
                 if row is None:
@@ -175,7 +187,8 @@ class SessionService:
         session_id: str,
         title: Optional[str] = None,
         status: Optional[str] = None,
-        metadata_updates: Optional[Dict[str, Any]] = None
+        metadata_updates: Optional[Dict[str, Any]] = None,
+        user_id: Optional[str] = None
     ) -> Optional[InterviewSession]:
         """
         更新会话信息（异步）
@@ -190,8 +203,15 @@ class SessionService:
             InterviewSession: 更新后的会话对象
         """
         async with db_manager.get_connection() as db:
-            # 检查会话是否存在
-            async with db.execute('SELECT session_id FROM sessions WHERE session_id = ?', (session_id,)) as cursor:
+            # 检查会话是否存在 (并校验 user_id)
+            check_sql = 'SELECT session_id FROM sessions WHERE session_id = ?'
+            check_params = [session_id]
+            
+            if user_id:
+                check_sql += ' AND user_id = ?'
+                check_params.append(user_id)
+                
+            async with db.execute(check_sql, check_params) as cursor:
                 if await cursor.fetchone() is None:
                     return None
             
@@ -234,7 +254,8 @@ class SessionService:
         session_id: str,
         role: str,
         content: str,
-        question_index: int = 0  # 新增参数
+        question_index: int = 0,
+        user_id: Optional[str] = None
     ) -> Optional[InterviewSession]:
         """
         向会话添加消息（异步）
@@ -249,8 +270,15 @@ class SessionService:
             InterviewSession: 更新后的会话对象
         """
         async with db_manager.get_connection() as db:
-            # 检查会话是否存在
-            async with db.execute('SELECT session_id FROM sessions WHERE session_id = ?', (session_id,)) as cursor:
+            # 检查会话是否存在 (并校验 user_id)
+            check_sql = 'SELECT session_id FROM sessions WHERE session_id = ?'
+            check_params = [session_id]
+            
+            if user_id:
+                check_sql += ' AND user_id = ?'
+                check_params.append(user_id)
+                
+            async with db.execute(check_sql, check_params) as cursor:
                 if await cursor.fetchone() is None:
                     logger.warning(f"会话不存在: {session_id}")
                     return None
@@ -276,7 +304,8 @@ class SessionService:
         status: Optional[str] = None,
         mode: Optional[str] = None,
         limit: Optional[int] = None,
-        offset: int = 0
+        offset: int = 0,
+        user_id: Optional[str] = None
     ) -> List[SessionListItem]:
         """
         获取会话列表（异步）
@@ -303,6 +332,10 @@ class SessionService:
             if mode:
                 conditions.append('mode = ?')
                 params.append(mode)
+            
+            if user_id:
+                conditions.append('user_id = ?')
+                params.append(user_id)
             
             where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
             
@@ -340,7 +373,7 @@ class SessionService:
                 
                 return sessions
     
-    async def delete_session(self, session_id: str) -> bool:
+    async def delete_session(self, session_id: str, user_id: Optional[str] = None) -> bool:
         """
         删除会话（异步）
         
@@ -359,8 +392,15 @@ class SessionService:
         """
         async with db_manager.get_connection() as db:
             try:
-                # 检查会话是否存在
-                async with db.execute('SELECT session_id FROM sessions WHERE session_id = ?', (session_id,)) as cursor:
+                # 检查会话是否存在 (并校验 user_id)
+                check_sql = 'SELECT session_id FROM sessions WHERE session_id = ?'
+                check_params = [session_id]
+                
+                if user_id:
+                    check_sql += ' AND user_id = ?'
+                    check_params.append(user_id)
+                
+                async with db.execute(check_sql, check_params) as cursor:
                     if await cursor.fetchone() is None:
                         logger.warning(f"会话不存在: {session_id}")
                         return False
@@ -392,7 +432,7 @@ class SessionService:
                 logger.error(f"✗ 删除会话失败，已回滚事务: {session_id}, 错误: {e}")
                 return False
     
-    async def get_session_count(self, status: Optional[str] = None) -> int:
+    async def get_session_count(self, status: Optional[str] = None, user_id: Optional[str] = None) -> int:
         """
         获取会话总数（异步）
         
@@ -406,9 +446,23 @@ class SessionService:
             if status:
                 async with db.execute('SELECT COUNT(*) as count FROM sessions WHERE status = ?', (status,)) as cursor:
                     result = await cursor.fetchone()
-            else:
-                async with db.execute('SELECT COUNT(*) as count FROM sessions') as cursor:
-                    result = await cursor.fetchone()
+            sql = 'SELECT COUNT(*) as count FROM sessions'
+            conditions = []
+            params = []
+            
+            if status:
+                conditions.append('status = ?')
+                params.append(status)
+                
+            if user_id:
+                conditions.append('user_id = ?')
+                params.append(user_id)
+                
+            if conditions:
+                sql += f" WHERE {' AND '.join(conditions)}"
+                
+            async with db.execute(sql, params) as cursor:
+                result = await cursor.fetchone()
             
             return result[0] if result else 0
 

@@ -18,6 +18,7 @@ import {
     maskApiKey,
     useInterviewStore
 } from '@/store/useInterviewStore';
+import { getUserId } from '@/hooks/useUserIdentity';
 
 interface SettingsDialogProps {
     open: boolean;
@@ -92,7 +93,10 @@ function ModelFormDialog({ open, onClose, onSave, editingModel }: ModelFormDialo
             const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
             const response = await fetch(`${API_BASE_URL}/api/config/validate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User-ID': getUserId()
+                },
                 body: JSON.stringify({
                     api_key: apiKey,
                     base_url: baseUrl,

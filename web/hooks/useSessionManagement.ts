@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from 'react';
+import { getUserId } from './useUserIdentity';
 
 // 类型定义
 export interface Message {
@@ -63,6 +64,7 @@ export function useSessionManagement() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-User-ID': getUserId(),
                 },
                 body: JSON.stringify({
                     mode,
@@ -108,7 +110,9 @@ export function useSessionManagement() {
             params.append('limit', limit.toString());
             params.append('offset', offset.toString());
 
-            const response = await fetch(`${API_BASE_URL}/api/sessions/?${params}`);
+            const response = await fetch(`${API_BASE_URL}/api/sessions/?${params}`, {
+                headers: { 'X-User-ID': getUserId() }
+            });
 
             if (!response.ok) {
                 throw new Error('获取会话列表失败');
@@ -133,7 +137,9 @@ export function useSessionManagement() {
         setError(null);
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`);
+            const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+                headers: { 'X-User-ID': getUserId() }
+            });
 
             if (!response.ok) {
                 throw new Error('获取会话详情失败');
@@ -169,6 +175,7 @@ export function useSessionManagement() {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-User-ID': getUserId(),
                 },
                 body: JSON.stringify(updates),
             });
@@ -207,6 +214,7 @@ export function useSessionManagement() {
         try {
             const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
                 method: 'DELETE',
+                headers: { 'X-User-ID': getUserId() }
             });
 
             if (!response.ok) {
@@ -247,6 +255,7 @@ export function useSessionManagement() {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-User-ID': getUserId(),
                 },
                 body: JSON.stringify({
                     metadata: { pinned }
@@ -295,6 +304,7 @@ export function useSessionManagement() {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-User-ID': getUserId(),
                 },
                 body: JSON.stringify({ title }),
             });

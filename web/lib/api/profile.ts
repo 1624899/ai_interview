@@ -3,6 +3,7 @@
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { getUserId } from '@/hooks/useUserIdentity';
 
 // 维度评分接口
 export interface DimensionScore {
@@ -41,7 +42,9 @@ export interface ProfileResponse {
  */
 export async function getOverallProfile(): Promise<ProfileResponse> {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/chat/profile/overall`);
+        const response = await fetch(`${API_BASE_URL}/api/chat/profile/overall`, {
+            headers: { 'X-User-ID': getUserId() }
+        });
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -66,7 +69,8 @@ export async function generateProfile(): Promise<ProfileResponse> {
         const response = await fetch(`${API_BASE_URL}/api/chat/profile/generate`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-User-ID': getUserId()
             }
         });
 

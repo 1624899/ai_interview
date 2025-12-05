@@ -59,6 +59,7 @@ class SessionCreateRequest(BaseModel):
     resume_filename: Optional[str] = Field(None, description="简历文件名")
     job_description: Optional[str] = Field(None, description="岗位描述")
     max_questions: int = Field(default=5, description="最大问题数量")
+    user_id: Optional[str] = Field(None, description="用户标识")
 
 
 class SessionUpdateRequest(BaseModel):

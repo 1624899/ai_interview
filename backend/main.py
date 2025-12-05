@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
     
     # 初始化数据库
     from app.database import init_database
-    init_database()
+    await init_database()
     
     # 确保数据目录存在
     data_dir = os.path.join(os.path.dirname(__file__), "data")

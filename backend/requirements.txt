@@ -31,5 +31,5 @@ structlog>=23.2.0
 
 # 开发工具 (可选)
 pytest>=7.4.0
-pytest-asyncio>=0.21.0
+psycopg-binary>=3.3.1
 httpx>=0.25.0

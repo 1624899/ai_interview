@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="web/public/icon.svg" alt="AI Interview Agent" width="80" height="80">
+  <img src="web\public\mascot.png" alt="AI Interview Agent" width="80" height="80">
 </p>
 
 <h1 align="center">🎯 AI 面试智能体</h1>
@@ -32,7 +32,10 @@ AI 面试智能体是一个利用大语言模型（LLM）和 LangGraph 状态机
 
 ### 🎬 演示
 
-![Demo Screenshot](docs/demo-screenshot.png)
+![Demo Screenshot](Screenshot\1.png)
+![Demo Screenshot](Screenshot\2.png)
+![Demo Screenshot](Screenshot\3.png)
+![Demo Screenshot](Screenshot\4.png)
 
 ---
 

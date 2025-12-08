@@ -2,8 +2,7 @@ import os
 import logging
 from typing import List
 from fastapi import UploadFile
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_core.documents import Document
+from pypdf import PdfReader
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -51,12 +50,17 @@ class FileService:
         return file_size <= self.max_file_size_bytes
     
     def extract_text_from_pdf(self, file_path: str) -> str:
-        """解析 PDF 文件"""
+        """解析 PDF 文件（使用 pypdf）"""
         try:
             logger.info(f"开始解析 PDF: {file_path}")
-            loader = PyPDFLoader(file_path)
-            pages: List[Document] = loader.load()
-            full_text = "\n\n".join([page.page_content for page in pages])
+            reader = PdfReader(file_path)
+            pages_text = []
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    pages_text.append(text)
+            
+            full_text = "\n\n".join(pages_text)
             
             if not full_text.strip():
                 raise ValueError("PDF 解析成功但内容为空")

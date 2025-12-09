@@ -81,15 +81,17 @@ export interface InterviewProgress {
     total: number;
 }
 
-// API 提供商配置
+// API 提供商配置 (2025年最新模型)
 export const API_PROVIDERS = [
-    { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'] },
-    { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', models: ['deepseek-chat', 'deepseek-reasoner'] },
-    { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4-plus', 'glm-4-flash', 'glm-4-air'] },
-    { id: 'aliyun', name: '阿里云百炼', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', models: ['qwen-plus', 'qwen-turbo', 'qwen-max'] },
-    { id: 'moonshot', name: 'Moonshot', baseUrl: 'https://api.moonshot.cn/v1', models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'] },
-    { id: 'siliconflow', name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', models: [] },
-    { id: 'custom', name: '自定义', baseUrl: '', models: [] },
+    { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', apiKeyUrl: 'https://platform.openai.com/api-keys', models: ['gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-4o-mini', 'gpt-4o'] },
+    { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', apiKeyUrl: 'https://platform.deepseek.com/api_keys', models: ['deepseek-chat', 'deepseek-reasoner'] },
+    { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', apiKeyUrl: 'https://open.bigmodel.cn/usercenter/apikeys', models: ['glm-4.6', 'glm-4.5', 'glm-4-flash', 'glm-4-air'] },
+    { id: 'aliyun', name: '阿里云百炼', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', apiKeyUrl: 'https://bailian.console.aliyun.com/#/api-key', models: ['qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen3-235b', 'qwen3-30b'] },
+    { id: 'moonshot', name: 'Moonshot', baseUrl: 'https://api.moonshot.cn/v1', apiKeyUrl: 'https://platform.moonshot.cn/console/api-keys', models: ['kimi-k2-thinking', 'kimi-k2-turbo-preview', 'kimi-k2'] },
+    { id: 'siliconflow', name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', apiKeyUrl: 'https://cloud.siliconflow.cn/account/ak', models: ['deepseek-ai/DeepSeek-V3.2', 'deepseek-ai/DeepSeek-R1', 'Qwen/Qwen3-235B', 'THUDM/glm-4.5', 'moonshot-ai/Kimi-K2'] },
+    { id: 'iflow', name: '心流开放平台（免费）', baseUrl: 'https://apis.iflow.cn/v1', apiKeyUrl: 'https://platform.iflow.cn/profile?tab=apiKey', models: ['qwen-max', 'qwen3-coder-plus', 'glm-4.6', 'kimi-k2', 'qwen3-235b-a22b-instruct', 'deepseek-v3.2'] },
+    { id: 'modelscope', name: 'ModelScope（免费）', baseUrl: 'https://api-inference.modelscope.cn/v1', apiKeyUrl: 'https://www.modelscope.cn/my/myaccesstoken', models: ['deepseek-ai/DeepSeek-V3.2', 'Qwen/Qwen3-Coder-480B-A35B-Instruct', 'Qwen/Qwen3-235B-A22B-Instruct-2507'] },
+    { id: 'custom', name: '自定义', baseUrl: '', apiKeyUrl: '', models: [] },
 ];
 
 const DEFAULT_API_CONFIG: ApiConfig = {

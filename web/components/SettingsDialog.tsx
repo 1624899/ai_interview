@@ -196,9 +196,25 @@ function ModelFormDialog({ open, onClose, onSave, editingModel }: ModelFormDialo
                                 {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                         </div>
-                        <p className="text-xs text-gray-400">
-                            您的 API Key 仅保存在浏览器本地，不会上传到服务器
-                        </p>
+                        {currentProvider?.apiKeyUrl ? (
+                            <p className="text-xs text-teal-600">
+                                <a
+                                    href={currentProvider.apiKeyUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hover:underline inline-flex items-center gap-1"
+                                >
+                                    → 点击获取 {currentProvider.name} API Key
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg>
+                                </a>
+                            </p>
+                        ) : (
+                            <p className="text-xs text-gray-400">
+                                您的 API Key 仅保存在浏览器本地，不会上传到服务器
+                            </p>
+                        )}
                     </div>
 
                     {/* Base URL */}

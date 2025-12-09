@@ -51,6 +51,7 @@ export default function InterviewPage() {
     currentSession,
     showAbilityProfile,
     isConfigured,
+    apiConfig, // 订阅 apiConfig 以便配置更新时自动刷新
     sessions,
     sessionLoading,
     threadId,

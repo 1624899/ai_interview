@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { PanelLeft, Bot, Sparkles, AlertCircle, Loader2, X, Upload, FileText, GraduationCap, Timer, Maximize2, Square, ArrowDown, Mic, Award, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ChatMessage";
@@ -50,7 +50,6 @@ export default function InterviewPage() {
     maxQuestions,
     currentSession,
     showAbilityProfile,
-    isConfigured,
     apiConfig, // 订阅 apiConfig 以便配置更新时自动刷新
     sessions,
     sessionLoading,
@@ -223,8 +222,12 @@ export default function InterviewPage() {
   // 逻辑：没有消息且没有当前会话，且不在流式传输中
   const showWelcome = messages.length === 0 && !currentSession && !isStreaming;
 
-  // API 配置状态
-  const hasApiConfig = isConfigured();
+  // API 配置状态 - 使用 useMemo 确保 apiConfig 变化时重新计算
+  const hasApiConfig = useMemo(() => {
+    const smartModel = apiConfig.models.find(m => m.id === apiConfig.smartModelId);
+    const fastModel = apiConfig.models.find(m => m.id === apiConfig.fastModelId);
+    return !!(smartModel?.apiKey && fastModel?.apiKey);
+  }, [apiConfig]);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-white text-[#1d1d1f] font-sans antialiased">

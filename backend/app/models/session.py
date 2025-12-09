@@ -27,6 +27,11 @@ class SessionMetadata(BaseModel):
     max_questions: int = Field(default=5, description="最大问题数量")
     status: Literal["active", "completed", "archived"] = Field(default="active", description="会话状态")
     pinned: bool = Field(default=False, description="是否置顶")
+    # 多轮面试字段
+    series_id: Optional[str] = Field(None, description="系列ID，串联所有轮次")
+    round_index: int = Field(default=1, description="轮次序号：1, 2, 3...")
+    round_type: str = Field(default="tech_initial", description="面试类型")
+    parent_session_id: Optional[str] = Field(None, description="上一轮Session ID")
 
 
 class InterviewSession(BaseModel):
@@ -41,7 +46,7 @@ class InterviewSession(BaseModel):
 
 class SessionListItem(BaseModel):
     """会话列表项（简化版）"""
-    session_id: str = Field(..., description="会话ID")
+    session_id: str = Field(..., description="会话 ID")
     title: str = Field(..., description="会话标题")
     created_at: str = Field(..., description="创建时间")
     updated_at: str = Field(..., description="更新时间")
@@ -50,6 +55,9 @@ class SessionListItem(BaseModel):
     message_count: int = Field(default=0, description="消息数量")
     question_count: int = Field(default=0, description="已提问数量")
     pinned: bool = Field(default=False, description="是否置顶")
+    # 多轮面试字段
+    round_index: int = Field(default=1, description="轮次序号")
+    round_type: str = Field(default="tech_initial", description="面试类型")
 
 
 class SessionCreateRequest(BaseModel):

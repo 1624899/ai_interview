@@ -73,9 +73,9 @@ class InterviewStartRequest(BaseModel):
     """面试开始请求模型"""
     thread_id: str = Field(..., description="会话线程ID")
     mode: Literal["mock"] = Field(..., description="面试模式")
-    resume_context: str = Field(..., description="简历上下文")
+    resume_context: Optional[str] = Field(default=None, description="简历上下文（下一轮面试时可从数据库加载）")
     resume_filename: str = Field(default="", description="简历文件名")
-    job_description: str = Field(..., description="岗位描述")
+    job_description: Optional[str] = Field(default=None, description="岗位描述（下一轮面试时可从数据库加载）")
     company_info: str = Field(default="未知", description="公司背景信息")
     max_questions: int = Field(default=5, description="最大问题数量")
     # 用户配置（可选）

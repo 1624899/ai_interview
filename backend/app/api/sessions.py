@@ -7,6 +7,7 @@ import logging
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Header
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from app.models.session import (
     SessionCreateRequest,
@@ -23,6 +24,11 @@ router = APIRouter(prefix="/api/sessions", tags=["会话管理"])
 
 # 实例化会话服务
 session_service = SessionService()
+
+
+class NextRoundRequest(BaseModel):
+    """下一轮面试请求"""
+    max_questions: int = 5
 
 
 @router.post("/", response_model=SessionDetailResponse)
@@ -309,5 +315,53 @@ async def add_message_to_session(
             detail={
                 "error": "InternalServerError",
                 "message": "添加消息失败"
+            }
+        )
+
+
+@router.post("/{session_id}/next-round", response_model=SessionDetailResponse)
+async def create_next_round(
+    session_id: str,
+    request: NextRoundRequest,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
+    """
+    从已完成的面试创建下一轮面试
+    
+    Args:
+        session_id: 上一轮会话ID
+        request: 下一轮请求
+        
+    Returns:
+        SessionDetailResponse: 新会话详情
+    """
+    try:
+        new_session = await session_service.create_next_round(
+            parent_session_id=session_id,
+            max_questions=request.max_questions,
+            user_id=x_user_id
+        )
+        
+        return SessionDetailResponse(
+            success=True,
+            session=new_session
+        )
+        
+    except ValueError as e:
+        # 业务逻辑错误（如未完成的面试）
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "BadRequest",
+                "message": str(e)
+            }
+        )
+    except Exception as e:
+        logger.error(f"创建下一轮面试失败: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "InternalServerError",
+                "message": "创建下一轮面试失败"
             }
         )

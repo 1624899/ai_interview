@@ -10,6 +10,7 @@ import { AbilityProfileView } from "@/components/AbilityProfileView";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { useInterviewStore } from "@/store/useInterviewStore";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { getUserId } from "@/hooks/useUserIdentity";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toaster, toast } from "sonner";
@@ -82,7 +83,7 @@ export default function InterviewPage() {
   // ===== 初始化 =====
   useEffect(() => {
     setIsMounted(true);
-    fetchSessions('active', 'mock');
+    fetchSessions(undefined, 'mock');
   }, [fetchSessions]);
 
   // ===== API 错误 Toast 提示 =====
@@ -233,19 +234,19 @@ export default function InterviewPage() {
     }
   }, [messages, autoScrollEnabled]);
 
-  // 防止 Hydration 错误
-  if (!isMounted) return null;
-
-  // 判断是否显示欢迎页
-  // 逻辑：没有消息且没有当前会话，且不在流式传输中
-  const showWelcome = messages.length === 0 && !currentSession && !isStreaming;
-
   // API 配置状态 - 使用 useMemo 确保 apiConfig 变化时重新计算
   const hasApiConfig = useMemo(() => {
     const smartModel = apiConfig.models.find(m => m.id === apiConfig.smartModelId);
     const fastModel = apiConfig.models.find(m => m.id === apiConfig.fastModelId);
     return !!(smartModel?.apiKey && fastModel?.apiKey);
   }, [apiConfig]);
+
+  // 防止 Hydration 错误
+  if (!isMounted) return null;
+
+  // 判断是否显示欢迎页
+  // 逻辑：没有消息且没有当前会话，且不在流式传输中
+  const showWelcome = messages.length === 0 && !currentSession && !isStreaming;
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-white text-[#1d1d1f] font-sans antialiased">
@@ -582,6 +583,146 @@ export default function InterviewPage() {
               {/* 输入区域 */}
               <div className="relative w-full bg-white border-t border-gray-100 px-6 py-4 z-20">
                 <div className="max-w-3xl mx-auto relative">
+                  {/* 开启下一轮面试按钮 - 仅在面试完成时显示 */}
+                  {interviewProgress &&
+                    interviewProgress.current >= interviewProgress.total &&
+                    currentSession?.metadata.status === 'completed' && (
+                      <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-200">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900 mb-1">面试已完成！</h4>
+                            <p className="text-sm text-gray-600">
+                              继续进行下一轮面试，深入考察您的专业能力
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <select
+                              id="next-round-questions"
+                              className="h-9 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                              defaultValue={5}
+                              onChange={(e) => {
+                                // 更新全局状态中的 maxQuestions
+                                useInterviewStore.setState({ maxQuestions: parseInt(e.target.value) });
+                              }}
+                            >
+                              {[3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                                <option key={n} value={n}>{n} 道题</option>
+                              ))}
+                            </select>
+                            <Button
+                              onClick={async () => {
+                                try {
+                                  // 从 store 获取最新的题目数量
+                                  const nextRoundQuestions = useInterviewStore.getState().maxQuestions;
+
+                                  // 设置加载状态，清空消息以显示加载动画
+                                  useInterviewStore.setState({
+                                    isLoading: true,
+                                    isStreaming: true,
+                                    messages: [],
+                                    interviewProgress: { current: 0, total: nextRoundQuestions }
+                                  });
+
+                                  // 1. 创建下一轮会话
+                                  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/sessions/${currentSession.session_id}/next-round`, {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'X-User-ID': getUserId()
+                                    },
+                                    body: JSON.stringify({
+                                      max_questions: nextRoundQuestions
+                                    })
+                                  });
+
+                                  if (!response.ok) {
+                                    const error = await response.json();
+                                    throw new Error(error.message || '创建下一轮失败');
+                                  }
+
+                                  const data = await response.json();
+                                  const newSessionId = data.session.session_id;
+
+                                  // 2. 刷新会话列表并选择新会话
+                                  await fetchSessions(undefined, 'mock');
+                                  await selectSession(newSessionId);
+
+                                  // 3. 直接调用 /chat/start，后端会从数据库加载继承的简历/JD
+                                  const apiConfig = useInterviewStore.getState().getApiConfigForRequest();
+                                  if (!apiConfig) {
+                                    throw new Error('请先配置 API');
+                                  }
+
+                                  const startResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/start`, {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'X-User-ID': getUserId()
+                                    },
+                                    body: JSON.stringify({
+                                      thread_id: newSessionId,
+                                      mode: 'mock',
+                                      max_questions: nextRoundQuestions,
+                                      api_config: apiConfig,
+                                    })
+                                  });
+
+                                  if (!startResponse.ok) {
+                                    throw new Error('启动面试失败');
+                                  }
+
+                                  // 4. 处理流式响应
+                                  const reader = startResponse.body?.getReader();
+                                  if (reader) {
+                                    const decoder = new TextDecoder();
+                                    let buffer = '';
+
+                                    while (true) {
+                                      const { done, value } = await reader.read();
+                                      if (done) {
+                                        if (buffer.trim()) {
+                                          try {
+                                            const jsonData = JSON.parse(buffer);
+                                            if (jsonData.first_question) {
+                                              useInterviewStore.setState({
+                                                messages: [{
+                                                  role: 'ai',
+                                                  content: jsonData.first_question,
+                                                  timestamp: new Date().toISOString(),
+                                                }],
+                                                isLoading: false,
+                                                isStreaming: false,
+                                              });
+                                            }
+                                          } catch { }
+                                        }
+                                        break;
+                                      }
+                                      buffer += decoder.decode(value, { stream: true });
+                                    }
+                                  }
+
+                                } catch (error) {
+                                  console.error('创建下一轮失败:', error);
+                                  toast.error((error as Error).message || '创建下一轮失败');
+                                  useInterviewStore.setState({ isLoading: false, isStreaming: false });
+                                }
+                              }}
+                              disabled={isLoading || isStreaming}
+                              className="bg-teal-600 hover:bg-teal-700 text-white gap-2 disabled:opacity-50"
+                            >
+                              {isLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Plus className="w-4 h-4" />
+                              )}
+                              {isLoading ? '准备中...' : '开启下一轮'}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                   {/* 跳转到底部按钮 - 移动到输入框上方 */}
                   {showScrollButton && (
                     <div className="absolute -top-12 left-0 right-0 flex justify-center z-20 pointer-events-none">
@@ -609,7 +750,7 @@ export default function InterviewPage() {
                           handleSend();
                         }
                       }}
-                      disabled={isStreaming}
+                      disabled={isStreaming || !!(interviewProgress && interviewProgress.current >= interviewProgress.total)}
                     />
                     <Button
                       size="icon"
@@ -632,7 +773,7 @@ export default function InterviewPage() {
                           : "bg-gray-100 text-gray-400"
                       )}
                       onClick={isStreaming ? stopStreaming : handleSend}
-                      disabled={!isStreaming && !input.trim()}
+                      disabled={(!isStreaming && !input.trim()) || !!(interviewProgress && interviewProgress.current >= interviewProgress.total)}
                     >
                       {isStreaming ? (
                         <Square className="h-4 w-4" fill="currentColor" />

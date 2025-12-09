@@ -45,7 +45,8 @@ async def start_interview(
     print(f"mode: {request.mode}")
     print(f"max_questions: {request.max_questions}")
     print(f"resume_filename: {request.resume_filename}")
-    print(f"job_description: {request.job_description[:100]}..." if len(request.job_description) > 100 else f"job_description: {request.job_description}")
+    jd = request.job_description or ""
+    print(f"job_description: {jd[:100]}..." if len(jd) > 100 else f"job_description: {jd}")
     print(f"company_info: {request.company_info}")
     print(f"api_config: {request.api_config}")
     print("=" * 80)
@@ -91,7 +92,7 @@ async def start_interview(
         }
         
         # 检查会话是否已存在，如果不存在则创建
-        session = await session_service.get_session(request.thread_id)
+        session = await session_service.get_session(request.thread_id, include_resume_content=True)
         if session is None:
             await session_service.create_session(
                 session_id=request.thread_id,
@@ -104,12 +105,19 @@ async def start_interview(
                 user_id=x_user_id or "default_user"
             )
             session_created = True  # 标记为新创建
+        else:
+            # 会话已存在（例如：下一轮面试），从数据库加载继承的简历和JD
+            if not request.resume_context and session.metadata.resume_content:
+                inputs["resume_context"] = session.metadata.resume_content
+            if not request.job_description and session.metadata.job_description:
+                inputs["job_description"] = session.metadata.job_description
+            if session.metadata.company_info:
+                inputs["company_info"] = session.metadata.company_info
         
-        # 生成并更新会话标题
-        mode_str = "辅导模式" if request.mode == "coach" else "模拟面试"
-        # 截取前20个字符作为摘要，防止过长
-        summary = request.job_description[:20] + "..." if len(request.job_description) > 20 else request.job_description
-        title = f"{mode_str}-{summary}"
+        # 生成并更新会话标题：{JD摘要} - 第1轮
+        jd_for_title = inputs["job_description"] or request.job_description or ""
+        summary = jd_for_title[:15] + "..." if len(jd_for_title) > 15 else jd_for_title
+        title = f"{summary} - 第1轮"
         
         # 更新数据库中的会话标题
         await session_service.update_session(request.thread_id, title=title)

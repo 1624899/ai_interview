@@ -100,27 +100,94 @@ class InterviewState(TypedDict):
 async def node_planner(state: InterviewState):
     """
     规划节点：生成面试题目
+    根据轮次类型调整面试侧重点
     """
     job_desc = state["job_description"]
     resume = state["resume_context"]
     company_info = state.get("company_info", "")
     max_q = state.get("max_questions", 5)
+    session_id = state.get("session_id")
+    
+    # 获取轮次信息
+    round_index = 1
+    round_type = "tech_initial"
+    previous_profile = None
+    previous_questions = []  # 上一轮的问题列表
+    
+    if session_id:
+        try:
+            from app.database.session_service import SessionService
+            service = SessionService()
+            session = await service.get_session(session_id)
+            if session:
+                round_index = session.metadata.round_index
+                round_type = session.metadata.round_type
+                
+                # 获取上一轮画像和问题（如果是第二轮及以后）
+                if round_index > 1 and session.metadata.parent_session_id:
+                    previous_profile = await service.get_profile(session.metadata.parent_session_id)
+                    # 获取上一轮的面试计划
+                    parent_plan = await service.get_interview_plan(session.metadata.parent_session_id)
+                    if parent_plan:
+                        previous_questions = [q.get("content", q.get("topic", "")) for q in parent_plan]
+        except Exception as e:
+            logger.error(f"获取轮次信息失败: {e}")
     
     company_section = f"\n    【公司信息】：\n    {company_info}\n" if company_info else ""
-
-    prompt = f"""你是一位资深技术面试官。请根据以下信息设计 {max_q} 道面试题目。
+    
+    # 根据轮次类型定制策略
+    round_strategies = {
+        "tech_initial": {
+            "focus": "基础专业能力和项目/工作经验",
+            "requirements": """
+    1. 第 1 道为自我介绍题。
+    2. 重点考察简历中提到的核心技能和专业知识。
+    3. 至少包含 1 道行为面试题（如：团队合作、解决冲突的经历）。
+    4. 题目难度适中，覆盖广度而非深度。
+    5. 每道题应该是独立的、具体的问题，不要一道题包含过多子问题。"""
+        },
+        "tech_deep": {
+            "focus": "针对简历项目/经历的深入追问",
+            "requirements": f"""
+    1. 不需要自我介绍，直接进入专业问题。
+    2. 【重要】基于简历中的具体项目或工作经历进行深挖，而不是出全新的宏大开放题。
+    3. 从简历已有内容延伸，逐步深入到专业原理和细节层面。{f' 上一轮评估供参考：{previous_profile.get("overall_assessment", "")[:200]}' if previous_profile else ''}
+    4. 可以包含 1 道中等规模的案例分析或方案设计题。
+    5. 每道题聚焦单一知识点或能力维度，避免一道题问太多内容。"""
+        },
+        "hr_comprehensive": {
+            "focus": "综合素质、全局思维和软技能",
+            "requirements": """
+    1. 可以包含 1 道综合性案例题（考察全局分析和方案设计能力）。
+    2. 至少包含 2 道行为面试题（考察领导力、抗压能力、职业规划等）。
+    3. 考察候选人的沟通表达、价值观和文化匹配度。
+    4. 可以出开放性问题，考察候选人的思维广度和深度。"""
+        }
+    }
+    
+    strategy = round_strategies.get(round_type, round_strategies["tech_initial"])
+    
+    # 构建上一轮问题的提示
+    previous_questions_section = ""
+    if previous_questions:
+        questions_text = "\n".join([f"    - {q}" for q in previous_questions])
+        previous_questions_section = f"""
+    【上一轮已问过的问题（请勿重复）】：
+{questions_text}
+"""
+    
+    prompt = f"""你是一位资深面试官。这是第 {round_index} 轮面试（类型：{round_type}）。请根据以下信息设计 {max_q} 道面试题目。
     
     【岗位描述】：
     {job_desc}
     {company_section}
-    【候选人简历摘要】：
-    {resume[:2000]}
+    【候选人简历】：
+    {resume}
+    {previous_questions_section}
+    【本轮面试侧重点】：{strategy['focus']}
     
     要求：
-    1. 题目难度适中，覆盖核心技能点。
-    2. 第 1 道为自我介绍题。
-    3. 至少包含 1 道行为面试题（Behavioral Question）。
-    4. 题目描述要清晰具体。
+    {strategy['requirements']}
     
     请严格按照以下 JSON 结构输出，确保包含所有字段。
     【重要】：不要包含 markdown 格式（如 ```json ... ```），只输出纯 JSON 字符串。
@@ -146,7 +213,6 @@ async def node_planner(state: InterviewState):
     interview_plan = [q.model_dump() for q in plan.questions]
     
     # 保存 interview_plan 到数据库
-    session_id = state.get("session_id")
     if session_id:
         try:
             from app.database.session_service import SessionService
@@ -330,6 +396,7 @@ async def node_summary(state: InterviewState):
     总结节点：生成面试报告
     """
     mode = state.get("mode", "mock")
+    session_id = state.get("session_id")
     
     # 使用策略模式获取对应模式的反馈提示词
     strategy = ModeStrategyFactory.get_strategy(mode)
@@ -342,6 +409,21 @@ async def node_summary(state: InterviewState):
     
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
     response = await smart_llm.ainvoke(messages)
+    
+    # ==========================================
+    # 更新会话状态为 completed
+    # ==========================================
+    if session_id:
+        try:
+            from app.database.session_service import SessionService
+            session_service = SessionService()
+            await session_service.update_session(
+                session_id=session_id,
+                status="completed"
+            )
+            logger.info(f"[Summary] 会话 {session_id} 状态已更新为 completed")
+        except Exception as e:
+            logger.error(f"[Summary] 更新会话状态失败: {e}")
     
     # ==========================================
     # 触发后台异步分析（面试结束，生成完整画像）

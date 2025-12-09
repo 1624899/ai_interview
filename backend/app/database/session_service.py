@@ -5,6 +5,7 @@
 
 import json
 import logging
+import uuid
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -86,6 +87,98 @@ class SessionService:
                     raise ValueError(f"会话 {session_id} 已存在")
                 raise
     
+    async def create_next_round(
+        self,
+        parent_session_id: str,
+        max_questions: int = 5,
+        user_id: Optional[str] = None
+    ) -> InterviewSession:
+        """
+        从已完成的面试创建下一轮面试
+        
+        Args:
+            parent_session_id: 上一轮会话ID
+            max_questions: 最大问题数量
+            user_id: 用户ID
+            
+        Returns:
+            新创建的下一轮会话
+            
+        Raises:
+            ValueError: 如果上一轮未完成或不存在
+        """
+        # 获取parent session，包含简历内容
+        parent = await self.get_session(parent_session_id, include_resume_content=True, user_id=user_id)
+        
+        if not parent:
+            raise ValueError(f"父会话不存在: {parent_session_id}")
+        
+        if parent.metadata.status != "completed":
+            raise ValueError(f"只能从已完成的面试创建下一轮（当前状态: {parent.metadata.status}）")
+        
+        # 计算新轮次
+        new_round_index = parent.metadata.round_index + 1
+        
+        # 自动推断面试类型
+        round_type_map = {
+            1: "tech_initial",
+            2: "tech_deep",
+            3: "hr_comprehensive"
+        }
+        new_round_type = round_type_map.get(new_round_index, "hr_comprehensive")
+        
+        # 确定series_id（如果parent没有，则生成新的）
+        series_id = parent.metadata.series_id
+        if not series_id:
+            series_id = str(uuid.uuid4())
+            # 更新parent session的series_id
+            async with db_manager.get_connection() as conn:
+                await conn.execute(
+                    'UPDATE sessions SET series_id = $1 WHERE session_id = $2',
+                    series_id, parent_session_id
+                )
+        
+        # 生成新session_id
+        new_session_id = str(uuid.uuid4())
+        
+        # 生成标题：{JD摘要} - 第N轮
+        jd = parent.metadata.job_description or ""
+        jd_summary = jd[:15] + "..." if len(jd) > 15 else jd
+        title = f"{jd_summary} - 第{new_round_index}轮"
+        
+        # 创建新会话
+        now = datetime.now()
+        async with db_manager.get_connection() as conn:
+            await conn.execute('''
+                INSERT INTO sessions (
+                    session_id, user_id, title, created_at, updated_at, mode,
+                    resume_filename, resume_content, job_description, company_info,
+                    question_count, max_questions, status, pinned,
+                    series_id, round_index, round_type, parent_session_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+            ''',
+                new_session_id,
+                user_id or "default_user",
+                title,
+                now, now,
+                parent.metadata.mode,
+                parent.metadata.resume_filename,
+                parent.metadata.resume_content,
+                parent.metadata.job_description,
+                parent.metadata.company_info,
+                0,  # question_count
+                max_questions,
+                'active',
+                False,  # pinned
+                series_id,
+                new_round_index,
+                new_round_type,
+                parent_session_id
+            )
+        
+        logger.info(f"创建下一轮面试: {new_session_id} (第{new_round_index}轮, 类型: {new_round_type})")
+        return await self.get_session(new_session_id)
+    
     async def get_session(
         self, 
         session_id: str, 
@@ -98,7 +191,8 @@ class SessionService:
             columns = [
                 "session_id", "title", "created_at", "updated_at", "mode",
                 "resume_filename", "job_description", "company_info",
-                "question_count", "max_questions", "status", "pinned"
+                "question_count", "max_questions", "status", "pinned",
+                "series_id", "round_index", "round_type", "parent_session_id"
             ]
             if include_resume_content:
                 columns.append("resume_content")
@@ -147,7 +241,11 @@ class SessionService:
                 question_count=row['question_count'],
                 max_questions=row['max_questions'],
                 status=row['status'],
-                pinned=bool(row['pinned'])
+                pinned=bool(row['pinned']),
+                series_id=row['series_id'],
+                round_index=row['round_index'] or 1,
+                round_type=row['round_type'] or 'tech_initial',
+                parent_session_id=row['parent_session_id']
             )
             
             created_at = row['created_at']
@@ -255,7 +353,7 @@ class SessionService:
             sql = '''
                 SELECT 
                     s.session_id, s.title, s.created_at, s.updated_at, s.mode, s.status,
-                    s.question_count, s.pinned,
+                    s.question_count, s.pinned, s.round_index, s.round_type,
                     (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.session_id) as message_count
                 FROM sessions s
                 WHERE 1=1
@@ -297,7 +395,9 @@ class SessionService:
                     status=row['status'],
                     message_count=row['message_count'],
                     question_count=row['question_count'],
-                    pinned=bool(row['pinned'])
+                    pinned=bool(row['pinned']),
+                    round_index=row['round_index'] or 1,
+                    round_type=row['round_type'] or 'tech_initial'
                 ))
             
             return sessions

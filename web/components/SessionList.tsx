@@ -192,10 +192,17 @@ function SessionItem({ session, isActive, onSelect, onDelete, onEdit, onTogglePi
                 <Pin className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" fill="currentColor" />
             )}
 
-            {/* 标题 */}
+            {/* 标题和轮次徽章 */}
             <div className="flex-1 min-w-0">
-                <div className="truncate leading-none font-medium" title={displayTitle}>
-                    {displayTitle}
+                <div className="flex items-center gap-1.5">
+                    <div className="truncate leading-none font-medium flex-1" title={displayTitle}>
+                        {displayTitle}
+                    </div>
+                    {session.round_index && session.round_index > 1 && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-100 text-teal-700 flex-shrink-0">
+                            第{session.round_index}轮
+                        </span>
+                    )}
                 </div>
             </div>
 

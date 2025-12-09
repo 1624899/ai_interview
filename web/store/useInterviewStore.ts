@@ -52,6 +52,8 @@ export interface SessionListItem {
     message_count: number;
     question_count: number;
     pinned?: boolean;
+    round_index?: number;
+    round_type?: string;
 }
 
 export interface ResumeInfo {

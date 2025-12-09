@@ -40,7 +40,11 @@ async def init_database():
                 max_questions INTEGER DEFAULT 5,
                 status TEXT DEFAULT 'active',
                 pinned BOOLEAN DEFAULT FALSE,
-                candidate_profile JSONB
+                candidate_profile JSONB,
+                series_id TEXT,
+                round_index INTEGER DEFAULT 1,
+                round_type TEXT DEFAULT 'tech_initial',
+                parent_session_id TEXT REFERENCES sessions(session_id)
             )
         ''')
         logger.info("✓ sessions 表已创建/验证")
@@ -98,6 +102,17 @@ async def init_database():
         await conn.execute('''
             CREATE INDEX IF NOT EXISTS idx_session_user_pinned 
             ON sessions(user_id, pinned DESC, updated_at DESC)
+        ''')
+        
+        # 多轮面试相关索引
+        await conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_session_series 
+            ON sessions(series_id)
+        ''')
+        
+        await conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_session_parent 
+            ON sessions(parent_session_id)
         ''')
         
         # 消息表索引

@@ -131,6 +131,9 @@ interface InterviewState {
     // ===== UI 状态 =====
     showAbilityProfile: boolean;
 
+    // ===== 错误状态 =====
+    apiError: string | null;
+
     // ===== 内部状态 =====
     _abortController: AbortController | null;
 }
@@ -172,6 +175,10 @@ interface InterviewActions {
 
     // ===== UI 状态 =====
     setShowAbilityProfile: (show: boolean) => void;
+
+    // ===== 错误处理 =====
+    setApiError: (error: string | null) => void;
+    clearApiError: () => void;
 }
 
 type InterviewStore = InterviewState & InterviewActions;
@@ -207,6 +214,7 @@ export const useInterviewStore = create<InterviewStore>()(
             maxQuestions: 5,
             apiConfig: DEFAULT_API_CONFIG,
             showAbilityProfile: false,
+            apiError: null,
             _abortController: null,
 
             // ===== 会话管理 Actions =====
@@ -588,6 +596,16 @@ export const useInterviewStore = create<InterviewStore>()(
                                         }
                                     } else if (data.type === 'done') {
                                         console.log('✅ 流式传输完成');
+                                    } else if (data.type === 'error') {
+                                        // 处理 SSE error 事件
+                                        console.error('收到 SSE 错误:', data.content);
+                                        let errorMessage = data.content || 'AI 响应失败';
+                                        if (errorMessage.includes('401') || errorMessage.toLowerCase().includes('unauthorized')) {
+                                            errorMessage = 'API Key 无效，请检查配置';
+                                        } else if (errorMessage.includes('404')) {
+                                            errorMessage = '模型不存在或 API 地址错误';
+                                        }
+                                        set({ apiError: errorMessage });
                                     } else {
                                         console.log('❓ 未知数据类型:', data.type);
                                     }
@@ -607,6 +625,23 @@ export const useInterviewStore = create<InterviewStore>()(
                 } catch (error) {
                     if ((error as Error).name !== 'AbortError') {
                         console.error('启动面试错误:', error);
+                        // 解析错误信息并反馈给用户
+                        let errorMessage = '启动面试失败，请重试';
+                        const errorStr = (error as Error).message || '';
+
+                        // 尝试解析后端返回的 JSON 错误
+                        try {
+                            const jsonMatch = errorStr.match(/\{[\s\S]*\}/);
+                            if (jsonMatch) {
+                                const errorJson = JSON.parse(jsonMatch[0]);
+                                if (errorJson.message) {
+                                    errorMessage = errorJson.message;
+                                }
+                            }
+                        } catch {
+                        }
+
+                        set({ apiError: errorMessage });
                         throw error;
                     }
                 } finally {
@@ -707,6 +742,16 @@ export const useInterviewStore = create<InterviewStore>()(
                                         } catch (e) {
                                             console.warn('解析 state_update 失败:', e);
                                         }
+                                    } else if (data.type === 'error') {
+                                        // 处理 SSE error 事件
+                                        console.error('❗ 收到 SSE 错误:', data.content);
+                                        let errorMessage = data.content || 'AI 响应失败';
+                                        if (errorMessage.includes('401') || errorMessage.toLowerCase().includes('unauthorized')) {
+                                            errorMessage = 'API Key 无效，请检查配置';
+                                        } else if (errorMessage.includes('404')) {
+                                            errorMessage = '模型不存在或 API 地址错误';
+                                        }
+                                        set({ apiError: errorMessage });
                                     }
                                 } catch (e) {
                                     // 忽略解析错误
@@ -718,6 +763,23 @@ export const useInterviewStore = create<InterviewStore>()(
                 } catch (error) {
                     if ((error as Error).name !== 'AbortError') {
                         console.error('发送消息错误:', error);
+                        let errorMessage = '发送消息失败，请重试';
+                        const errorStr = (error as Error).message || '';
+
+                        // 尝试解析后端返回的 JSON 错误
+                        try {
+                            const jsonMatch = errorStr.match(/\{[\s\S]*\}/);
+                            if (jsonMatch) {
+                                const errorJson = JSON.parse(jsonMatch[0]);
+                                if (errorJson.message) {
+                                    errorMessage = errorJson.message;
+                                }
+                            }
+                        } catch {
+                            // 解析失败，使用通用提示
+                        }
+
+                        set({ apiError: errorMessage });
                         throw error;
                     }
                 } finally {
@@ -871,6 +933,11 @@ export const useInterviewStore = create<InterviewStore>()(
             // ===== UI 状态 Actions =====
 
             setShowAbilityProfile: (show: boolean) => set({ showAbilityProfile: show }),
+
+            // ===== 错误处理 Actions =====
+
+            setApiError: (error: string | null) => set({ apiError: error }),
+            clearApiError: () => set({ apiError: null }),
         }),
         {
             name: 'interview-store',

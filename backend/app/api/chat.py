@@ -145,12 +145,36 @@ async def start_interview(
         }
         
     except Exception as e:
+        error_str = str(e).lower()
         logger.error(f"开始面试会话失败: {str(e)}", exc_info=True)
+        
+        if "401" in error_str or "unauthorized" in error_str or "invalid api key" in error_str or "authentication" in error_str:
+            message = "API Key 无效，请检查配置"
+            error_type = "AuthenticationError"
+        elif "404" in error_str or "not found" in error_str or "model" in error_str and "does not exist" in error_str:
+            message = "模型不存在或 API 地址错误，请检查配置"
+            error_type = "NotFoundError"
+        elif "timeout" in error_str or "timed out" in error_str:
+            message = "连接超时，请检查网络或 API 地址"
+            error_type = "TimeoutError"
+        elif "connection" in error_str or "connect" in error_str or "network" in error_str:
+            message = "无法连接到 API 服务器，请检查 Base URL"
+            error_type = "ConnectionError"
+        elif "rate limit" in error_str or "429" in error_str:
+            message = "API 请求过于频繁，请稍后重试"
+            error_type = "RateLimitError"
+        elif "insufficient" in error_str or "quota" in error_str or "balance" in error_str:
+            message = "API 余额不足，请充值后重试"
+            error_type = "QuotaError"
+        else:
+            message = f"开始面试会话失败: {str(e)[:100]}"
+            error_type = "InternalServerError"
+        
         raise HTTPException(
             status_code=500,
             detail={
-                "error": "InternalServerError",
-                "message": f"开始面试会话失败: {str(e)}"
+                "error": error_type,
+                "message": message
             }
         )
 

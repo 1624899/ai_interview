@@ -12,6 +12,7 @@ import { useInterviewStore } from "@/store/useInterviewStore";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Toaster, toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -73,7 +74,9 @@ export default function InterviewPage() {
     clearMessages,
     restoreMessages,
     setInterviewProgress,
-    setShowAbilityProfile: setStoreShowAbilityProfile
+    setShowAbilityProfile: setStoreShowAbilityProfile,
+    apiError,
+    clearApiError,
   } = useInterviewStore();
 
   // ===== 初始化 =====
@@ -81,6 +84,21 @@ export default function InterviewPage() {
     setIsMounted(true);
     fetchSessions('active', 'mock');
   }, [fetchSessions]);
+
+  // ===== API 错误 Toast 提示 =====
+  useEffect(() => {
+    if (apiError) {
+      toast.error(apiError, {
+        description: '请检查 API 配置后重试',
+        duration: 5000,
+        action: {
+          label: '去配置',
+          onClick: () => setShowSettingsDialog(true),
+        },
+      });
+      clearApiError();
+    }
+  }, [apiError, clearApiError]);
 
   // ===== 语音输入 =====
   const { isListening, toggleListening } = useSpeechToText({
@@ -107,7 +125,7 @@ export default function InterviewPage() {
       await startInterview();
     } catch (error) {
       console.error('启动面试失败:', error);
-      // 这里可以添加 toast 提示
+      // apiError 已在 store 中设置，useEffect 会自动显示 toast
     }
   };
 
@@ -668,6 +686,9 @@ export default function InterviewPage() {
         open={showSettingsDialog}
         onOpenChange={setShowSettingsDialog}
       />
+
+      {/* Toast 提示 */}
+      <Toaster position="top-center" richColors closeButton />
     </div>
   );
 }

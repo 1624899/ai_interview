@@ -388,7 +388,6 @@ export const useInterviewStore = create<InterviewStore>()(
                     if (!response.ok) throw new Error('上传简历失败');
 
                     const data = await response.json();
-                    console.log('📄 简历上传响应:', data);
                     set({
                         resume: {
                             filename: data.filename,
@@ -452,8 +451,6 @@ export const useInterviewStore = create<InterviewStore>()(
                     api_config: apiConfig,
                 };
 
-                console.log('🚀 发送 startInterview 请求:', requestBody);
-
                 try {
                     const response = await fetch(`${API_BASE_URL}/api/chat/start`, {
                         method: 'POST',
@@ -467,21 +464,19 @@ export const useInterviewStore = create<InterviewStore>()(
 
                     if (!response.ok) {
                         const errorText = await response.text();
-                        console.error('❌ 启动面试失败:', response.status, errorText);
+                        console.error('启动面试失败:', response.status, errorText);
                         throw new Error(`启动面试失败: ${response.status} - ${errorText}`);
                     }
 
-                    console.log('✅ 响应成功，开始处理流式数据...');
                     set({ isStreaming: true, isLoading: false });
 
                     // 处理流式响应
                     const reader = response.body?.getReader();
                     if (!reader) {
-                        console.error('❌ 无法获取响应流 reader');
+                        console.error('无法获取响应流 reader');
                         throw new Error('无法读取响应流');
                     }
 
-                    console.log('📖 成功获取 reader，开始读取流...');
                     const decoder = new TextDecoder();
                     let buffer = '';
                     let currentAiMessage = '';
@@ -490,19 +485,13 @@ export const useInterviewStore = create<InterviewStore>()(
                     while (true) {
                         const { done, value } = await reader.read();
                         chunkCount++;
-                        console.log(`📦 读取第 ${chunkCount} 个数据块, done: ${done}, size: ${value?.length || 0}`);
 
                         if (done) {
-                            console.log('🏁 流式传输结束');
                             // 处理 buffer 中剩余的数据
                             if (buffer.trim()) {
-                                console.log('📦 处理 buffer 中剩余的数据:', buffer.substring(0, 200));
-
                                 // 尝试直接解析为 JSON（后端当前实现）
                                 try {
                                     const data = JSON.parse(buffer);
-                                    console.log('📦 解析 JSON 数据:', data);
-
                                     if (data.first_question) {
                                         // 处理启动面试的响应
                                         set({
@@ -514,14 +503,14 @@ export const useInterviewStore = create<InterviewStore>()(
                                             isStreaming: false,
                                             isLoading: false,
                                         });
-                                        console.log('✅ 已设置第一题');
+
                                     }
                                 } catch (jsonError) {
                                     // 如果不是 JSON，尝试作为 SSE 格式处理
                                     if (buffer.startsWith('data: ')) {
                                         try {
                                             const data = JSON.parse(buffer.slice(6));
-                                            console.log('📦 解析 SSE buffer 数据:', data);
+
                                             if (data.type === 'token' || data.type === 'content') {
                                                 currentAiMessage += data.content || '';
                                                 set(state => {
@@ -540,10 +529,8 @@ export const useInterviewStore = create<InterviewStore>()(
                                                 });
                                             }
                                         } catch (e) {
-                                            console.warn('⚠️ 解析 buffer 数据失败:', e);
                                         }
                                     } else {
-                                        console.warn('⚠️ buffer 既不是 JSON 也不是 SSE 格式:', buffer.substring(0, 100));
                                     }
                                 }
                             }
@@ -554,15 +541,11 @@ export const useInterviewStore = create<InterviewStore>()(
                         const lines = buffer.split('\n');
                         buffer = lines.pop() || '';
 
-                        console.log(`📝 解析出 ${lines.length} 行数据`);
-
                         for (const line of lines) {
                             if (line.startsWith('data: ')) {
-                                console.log('📨 收到 SSE 数据行:', line);
+
                                 try {
                                     const data = JSON.parse(line.slice(6));
-                                    console.log('📦 解析后的数据:', data);
-
                                     if (data.type === 'token' || data.type === 'content') {
                                         currentAiMessage += data.content || '';
                                         set(state => {
@@ -580,7 +563,6 @@ export const useInterviewStore = create<InterviewStore>()(
                                             return { messages };
                                         });
                                     } else if (data.type === 'state_update') {
-                                        console.log('📊 更新面试进度:', data);
                                         try {
                                             const stateData = JSON.parse(data.content);
                                             if (stateData.question_count !== undefined) {
@@ -592,10 +574,7 @@ export const useInterviewStore = create<InterviewStore>()(
                                                 });
                                             }
                                         } catch (e) {
-                                            console.warn('解析 state_update 失败:', e);
                                         }
-                                    } else if (data.type === 'done') {
-                                        console.log('✅ 流式传输完成');
                                     } else if (data.type === 'error') {
                                         // 处理 SSE error 事件
                                         console.error('收到 SSE 错误:', data.content);
@@ -607,18 +586,17 @@ export const useInterviewStore = create<InterviewStore>()(
                                         }
                                         set({ apiError: errorMessage });
                                     } else {
-                                        console.log('❓ 未知数据类型:', data.type);
+
                                     }
                                 } catch (e) {
-                                    console.warn('⚠️ 解析 SSE 数据失败:', line, e);
+
                                 }
                             } else if (line.trim()) {
-                                console.log('📝 非 SSE 格式行:', line);
+
                             }
                         }
                     }
 
-                    console.log('🎉 流式处理完成，刷新会话列表...');
                     // 刷新会话列表
                     await get().fetchSessions('active', 'mock');
 
@@ -740,11 +718,10 @@ export const useInterviewStore = create<InterviewStore>()(
                                                 });
                                             }
                                         } catch (e) {
-                                            console.warn('解析 state_update 失败:', e);
                                         }
                                     } else if (data.type === 'error') {
                                         // 处理 SSE error 事件
-                                        console.error('❗ 收到 SSE 错误:', data.content);
+                                        console.error('收到 SSE 错误:', data.content);
                                         let errorMessage = data.content || 'AI 响应失败';
                                         if (errorMessage.includes('401') || errorMessage.toLowerCase().includes('unauthorized')) {
                                             errorMessage = 'API Key 无效，请检查配置';

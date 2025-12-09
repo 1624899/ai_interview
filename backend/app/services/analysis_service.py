@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 from app.models.candidate_profile import CandidateProfile, AnalysisContext, DimensionScore
-from app.core.llms import get_smart_llm
+from app.core.llms import get_llm_for_request
 from app.database.session_service import SessionService
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,6 @@ class CandidateAnalysisService:
     """候选人画像分析服务（后台异步运行）"""
     
     def __init__(self):
-        self.smart_llm = get_smart_llm()
         self.session_service = SessionService()
         # 缓存：session_id -> CandidateProfile
         self._profile_cache: Dict[str, CandidateProfile] = {}
@@ -30,7 +29,8 @@ class CandidateAnalysisService:
         resume: str,
         job_description: str,
         company_info: str,
-        qa_history: List[Dict[str, str]]
+        qa_history: List[Dict[str, str]],
+        api_config: Optional[Dict] = None
     ) -> CandidateProfile:
         """
         异步分析候选人能力画像
@@ -41,6 +41,7 @@ class CandidateAnalysisService:
             job_description: 岗位描述
             company_info: 公司信息
             qa_history: 问答历史 [{"question": "...", "answer": "..."}]
+            api_config: 用户的 API 配置
             
         Returns:
             CandidateProfile: 更新后的能力画像
@@ -58,8 +59,8 @@ class CandidateAnalysisService:
                 previous_profile=previous_profile
             )
             
-            # 调用 Smart LLM 进行分析
-            profile = await self._perform_analysis(context)
+            # 调用 Smart LLM 进行分析（使用用户配置的 API）
+            profile = await self._perform_analysis(context, api_config)
             
             # 更新缓存
             self._profile_cache[session_id] = profile
@@ -76,7 +77,7 @@ class CandidateAnalysisService:
             # 返回默认画像
             return self._get_default_profile()
     
-    async def _perform_analysis(self, context: AnalysisContext) -> CandidateProfile:
+    async def _perform_analysis(self, context: AnalysisContext, api_config: Optional[Dict] = None) -> CandidateProfile:
         """执行实际的 LLM 分析"""
         import json
         import re
@@ -85,8 +86,12 @@ class CandidateAnalysisService:
         prompt = self._build_analysis_prompt(context)
         
         try:
+            # 获取用户配置的 Smart LLM
+            smart_llm = get_llm_for_request(api_config, channel="smart")
+            logger.info(f"[AnalysisService] 使用用户配置的 Smart LLM 进行分析")
+            
             # 普通 LLM 调用
-            response = await self.smart_llm.ainvoke(prompt)
+            response = await smart_llm.ainvoke(prompt)
             response_text = response.content
             
             logger.debug(f"[AnalysisService] LLM 原始响应长度: {len(response_text)} 字符")

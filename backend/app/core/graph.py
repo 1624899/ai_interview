@@ -310,11 +310,14 @@ async def _trigger_background_analysis(state):
             logger.warning(f"[AnalysisService] 消息详情: {[(m.role, len(m.content)) for m in messages[:10]]}")
             return
         
+        # 获取用户的 API 配置
+        api_config = state.get("api_config")
+        
         logger.info(f"[AnalysisService] 开始异步分析会话 {session_id}，共 {len(qa_history)} 轮对话")
         
-        # 调用分析服务
+        # 调用分析服务（传入用户的 API 配置）
         service = get_analysis_service()
-        await service.analyze_candidate(session_id, resume, job_desc, company_info, qa_history)
+        await service.analyze_candidate(session_id, resume, job_desc, company_info, qa_history, api_config)
         
         logger.info(f"[AnalysisService] 会话 {session_id} 的画像分析已完成")
         

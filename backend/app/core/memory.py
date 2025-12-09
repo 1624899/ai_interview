@@ -1,8 +1,10 @@
 """
 LangGraph 记忆模块
 
-注意：由于 Windows 事件循环兼容性问题，暂时使用 MemorySaver。
-主要数据（会话、消息、画像）已通过 session_service 持久化到 PostgreSQL。
+使用 MemorySaver（内存存储）作为设计选择：
+- 会话数据（消息、画像、面试计划）已通过 SessionService 持久化到 PostgreSQL
+- 会话恢复时从数据库重建 InterviewState
+- 支持自定义的 rollback 逻辑（按消息索引）
 """
 
 import logging

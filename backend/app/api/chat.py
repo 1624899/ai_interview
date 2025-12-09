@@ -50,6 +50,8 @@ async def start_interview(
     print(f"api_config: {request.api_config}")
     print("=" * 80)
     
+    session_created = False  # 标记是否新创建了会话（用于异常时清理）
+    
     try:
         # 初始化图谱（异步）
         graph = await build_interview_graph(request.mode)
@@ -101,6 +103,7 @@ async def start_interview(
                 max_questions=request.max_questions,
                 user_id=x_user_id or "default_user"
             )
+            session_created = True  # 标记为新创建
         
         # 生成并更新会话标题
         mode_str = "辅导模式" if request.mode == "coach" else "模拟面试"
@@ -147,6 +150,14 @@ async def start_interview(
     except Exception as e:
         error_str = str(e).lower()
         logger.error(f"开始面试会话失败: {str(e)}", exc_info=True)
+        
+        # 如果新创建了会话但 LLM 调用失败，删除该空会话
+        if session_created:
+            try:
+                await session_service.delete_session(request.thread_id)
+                logger.info(f"已清理失败的会话: {request.thread_id}")
+            except Exception as cleanup_error:
+                logger.warning(f"清理失败会话时出错: {cleanup_error}")
         
         if "401" in error_str or "unauthorized" in error_str or "invalid api key" in error_str or "authentication" in error_str:
             message = "API Key 无效，请检查配置"
@@ -235,16 +246,14 @@ async def stream_chat(request: ChatRequest):
             "session_id": request.thread_id,
             "max_questions": request.max_questions,
             
-            # 🔥 状态注水：从数据库恢复关键状态
-            # 如果 Checkpoint 被清除（例如回退后），这些字段将帮助 Graph 恢复记忆
+            # 状态注水（恢复）
             "interview_plan": interview_plan if interview_plan else [],
             
             # 动态计算进度：基于最后一条消息的 question_index
             "question_count": session.messages[-1].question_index if session and session.messages else 0,
             "current_question_index": session.messages[-1].question_index if session and session.messages else 0,
             
-            # 因为 stream 接口总是处理用户的回答，所以必须进入 feedback 阶段
-            # 否则默认为 opening 会导致系统重复当前问题而不是推进到下一题
+            # 因为 stream 接口总是处理用户的回答，所以必须进入 feedback 阶段，否则默认为 opening 会导致系统重复当前问题而不是推进到下一题
             "turn_phase": "feedback",
             
             # 添加用户 API 配置

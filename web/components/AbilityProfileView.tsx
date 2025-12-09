@@ -6,6 +6,7 @@ import { getOverallProfile, generateProfile, type AbilityProfile } from '@/lib/a
 import { AbilityRadarChart } from './RadarChart';
 import { SkillTags } from './SkillTags';
 import { Button } from './ui/button';
+import { useInterviewStore } from '@/store/useInterviewStore';
 
 export function AbilityProfileView() {
     const [profile, setProfile] = useState<AbilityProfile | null>(null);
@@ -36,7 +37,17 @@ export function AbilityProfileView() {
     async function handleGenerate() {
         setGenerating(true);
         setError(null);
-        const response = await generateProfile();
+
+        // 获取当前 API 配置
+        const apiConfig = useInterviewStore.getState().getApiConfigForRequest();
+
+        if (!apiConfig) {
+            setError('请先在设置中配置 API Key');
+            setGenerating(false);
+            return;
+        }
+
+        const response = await generateProfile(apiConfig);
 
         if (response.success && response.profile) {
             setProfile(response.profile);

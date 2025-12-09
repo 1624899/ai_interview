@@ -64,14 +64,18 @@ export async function getOverallProfile(): Promise<ProfileResponse> {
 /**
  * 生成综合能力画像（手动触发）
  */
-export async function generateProfile(): Promise<ProfileResponse> {
+export async function generateProfile(apiConfig?: any): Promise<ProfileResponse> {
     try {
         const response = await fetch(`${API_BASE_URL}/api/chat/profile/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-User-ID': getUserId()
-            }
+            },
+            body: apiConfig ? JSON.stringify({
+                user_id: getUserId(),
+                api_config: apiConfig
+            }) : undefined
         });
 
         if (!response.ok) {

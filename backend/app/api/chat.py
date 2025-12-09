@@ -8,12 +8,12 @@ import logging
 import uuid
 from typing import AsyncGenerator
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Body
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 
 from app.core.graph import build_interview_graph
-from app.models.schemas import ChatRequest, ChatStreamResponse, InterviewStartRequest, ErrorResponse, RollbackRequest
+from app.models.schemas import ChatRequest, ChatStreamResponse, InterviewStartRequest, ErrorResponse, RollbackRequest, ProfileGenerateRequest
 from app.database.session_service import SessionService
 
 # 配置日志
@@ -496,6 +496,7 @@ async def rollback_chat(
 
 @router.post("/profile/generate")
 async def generate_profile(
+    request: Optional[ProfileGenerateRequest] = Body(None),
     x_user_id: Optional[str] = Header(None, alias="X-User-ID")
 ):
     """
@@ -509,10 +510,14 @@ async def generate_profile(
     try:
         from app.services.ability_service import get_ability_service
         
-        user_id = x_user_id or "default_user"
+        # 优先从 request 用 user_id，其次用 header，最后 default
+        user_id = (request.user_id if request else None) or x_user_id or "default_user"
+        api_config_dict = request.api_config.model_dump() if (request and request.api_config) else None
+        
         service = get_ability_service()
         # 注意：现在返回的是字典 {"profile": CandidateProfile, "warning": str}
-        result = await service.generate_overall_profile(user_id=user_id)
+        # 传递 api_config 供服务层使用
+        result = await service.generate_overall_profile(user_id=user_id, api_config=api_config_dict)
         
         profile = result["profile"]
         warning = result.get("warning")

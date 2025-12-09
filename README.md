@@ -48,7 +48,14 @@ AI 面试智能体是一个利用大语言模型（LLM）和 LangGraph 状态机
 - **流畅过渡**: AI 面试官自然引导对话，逐题推进
 - **结束报告**: 面试结束后生成综合评价报告（评分、优缺点、录用建议）
 
-### 📊 能力评估系统
+### � 多轮面试系统
+- **连续面试流程**: 一面完成后可一键开启下一轮，简历/JD 自动继承
+- **智能轮次推断**: 自动区分一面（基础）、二面（深度）、三面（综合）不同策略
+- **问题去重机制**: 下一轮自动避免重复上一轮已问过的问题
+- **轮次可视化**: 会话列表清晰显示"第N轮"标识
+- **灵活题数**: 支持自选 3-10 道题目，适应不同面试长度
+
+### �📊 能力评估系统
 - **多维度评分**: 技术能力、沟通能力、问题解决、学习能力、团队协作
 - **雷达图可视化**: 直观展示各项能力得分
 - **技能标签提取**: 自动识别展现的技术技能
@@ -202,12 +209,32 @@ ai-interview/
 │
 ├── web/                     # Next.js 前端
 │   ├── app/                 # App Router
-│   │   └── page.tsx         # 主页面
+│   │   ├── page.tsx         # 主页面（面试界面）
+│   │   ├── layout.tsx       # 根布局
+│   │   └── globals.css      # 全局样式
 │   ├── components/          # React 组件
-│   │   ├── ChatMessage.tsx
-│   │   ├── SessionSidebar.tsx
-│   │   └── AbilityProfileView.tsx
-│   └── store/               # Zustand 状态
+│   │   ├── ChatMessage.tsx       # 聊天消息气泡
+│   │   ├── SessionSidebar.tsx    # 会话侧边栏
+│   │   ├── SessionList.tsx       # 会话列表
+│   │   ├── SettingsDialog.tsx    # API 设置对话框
+│   │   ├── AbilityProfileView.tsx # 能力档案展示
+│   │   ├── RadarChart.tsx        # 能力雷达图
+│   │   ├── SkillTags.tsx         # 技能标签
+│   │   └── ui/                   # shadcn/ui 基础组件
+│   │       ├── button.tsx
+│   │       ├── dialog.tsx
+│   │       ├── input.tsx
+│   │       ├── scroll-area.tsx
+│   │       └── ...              # 其他 UI 组件
+│   ├── hooks/               # 自定义 Hooks
+│   │   ├── useUserIdentity.ts    # 用户身份识别
+│   │   └── useSpeechToText.ts    # 语音转文字
+│   ├── lib/                 # 工具库
+│   │   ├── utils.ts              # 通用工具函数
+│   │   └── api/
+│   │       └── profile.ts        # 能力画像 API
+│   └── store/               # Zustand 状态管理
+│       └── useInterviewStore.ts  # 面试状态管理 ⭐
 │
 ├── nginx/                   # Nginx 配置
 ├── docs/                    # 项目文档
@@ -255,6 +282,7 @@ docker-compose logs -f
 | `GET` | `/api/sessions/` | 获取会话列表 |
 | `POST` | `/api/sessions/` | 创建新会话 |
 | `GET` | `/api/sessions/{id}` | 获取会话详情 |
+| `POST` | `/api/sessions/{id}/next-round` | 从已完成面试创建下一轮 |
 | `DELETE` | `/api/sessions/{id}` | 删除会话 |
 | `POST` | `/api/upload/resume` | 上传简历 |
 | `GET` | `/health` | 健康检查 |
@@ -273,11 +301,15 @@ docker-compose logs -f
 - [x] 能力评估与雷达图
 - [x] 多 LLM 支持
 - [x] Docker 部署
+- [x] 多轮面试系统
+  - [x] 轮次自动推断（一面/二面/三面）
+  - [x] 问题去重机制
+  - [x] 简历/JD 自动继承
+  - [x] 灵活题数选择（3-10题）
 
 ### 🚧 进行中 / 计划中
 
 - [ ] 面试题库 (RAG)
-- [ ] 进阶面试/弱项挖掘
 - [ ] 定向简历优化
 - [ ] 语音输入 (Whisper STT)
 - [ ] 语音输出 (TTS)

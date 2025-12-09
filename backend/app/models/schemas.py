@@ -103,6 +103,12 @@ class ApiConfigValidateRequest(BaseModel):
     model: str = Field(..., description="模型名称")
 
 
+class ProfileGenerateRequest(BaseModel):
+    """画像生成请求"""
+    user_id: Optional[str] = Field(default=None, description="用户标识")
+    api_config: Optional[ApiConfig] = Field(default=None, description="用户自定义 API 配置")
+
+
 # ============================================================================
 # 评估结果数据模型（用于 Tool Calling 和结构化输出）
 # ============================================================================

@@ -39,10 +39,14 @@ class AbilityAnalysisService:
             logger.error(f"获取综合能力画像失败: {str(e)}", exc_info=True)
             return None
     
-    async def generate_overall_profile(self, user_id: str = "default_user") -> Dict[str, Any]:
+    async def generate_overall_profile(self, user_id: str = "default_user", api_config: Optional[Dict] = None) -> Dict[str, Any]:
         """
         生成用户综合能力画像（基于最近5次面试，带时间权重）
         生成后存入数据库
+        
+        Args:
+            user_id: 用户ID
+            api_config: 用户API配置
         
         Returns:
             Dict: 包含 profile 和 warning (可选)
@@ -70,7 +74,7 @@ class AbilityAnalysisService:
                 logger.info(f"开始聚合分析，共 {len(recent_profiles)} 次面试记录")
                     
                 # 4. 调用 LLM 进行时间加权聚合分析
-                profile = await self._aggregate_profiles_with_weights(recent_profiles)
+                profile = await self._aggregate_profiles_with_weights(recent_profiles, api_config)
                 
                 # 5. 保存到数据库
                 await self.session_service.save_user_profile(profile.model_dump(), user_id)
@@ -97,7 +101,7 @@ class AbilityAnalysisService:
                     "warning": "生成失败，已显示最近一次面试结果。请稍后重试。"
                 }
     
-    async def _aggregate_profiles_with_weights(self, profiles: List[Dict[str, Any]]) -> CandidateProfile:
+    async def _aggregate_profiles_with_weights(self, profiles: List[Dict[str, Any]], api_config: Optional[Dict] = None) -> CandidateProfile:
         """
         使用时间权重聚合分析多个画像
         
@@ -108,6 +112,10 @@ class AbilityAnalysisService:
         - 第4次：权重 0.55
         - 第5次：权重 0.40
         """
+        from app.core.llms import get_llm_for_request
+        
+        # 获取 LLM (优先使用用户配置)
+        llm = get_llm_for_request(api_config, channel="smart")
         
         # 为每个画像添加权重信息
         weighted_profiles = []
@@ -166,7 +174,7 @@ class AbilityAnalysisService:
 请客观、公正地进行评估，重点关注加权平均后的稳定表现。"""
         
         try:
-            response = await self.smart_llm.ainvoke(prompt)
+            response = await llm.ainvoke(prompt)
             content = response.content.strip()
             
             # 清理 markdown 标记

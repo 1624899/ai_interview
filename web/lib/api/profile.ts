@@ -92,3 +92,27 @@ export async function generateProfile(apiConfig?: any): Promise<ProfileResponse>
         };
     }
 }
+
+/**
+ * 获取单个会话的能力画像
+ */
+export async function getSessionProfile(sessionId: string): Promise<ProfileResponse> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/chat/profile/session/${sessionId}`, {
+            headers: { 'X-User-ID': getUserId() }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('获取会话画像失败:', error);
+        return {
+            success: false,
+            message: '网络错误，请稍后重试'
+        };
+    }
+}

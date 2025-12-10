@@ -126,8 +126,8 @@ export function SessionSidebar({
                                 if (window.innerWidth < 768) onClose();
                             }}
                         >
-                            <Award className="w-4 h-4 text-pink-500" />
-                            <span className="text-sm font-medium">能力画像</span>
+                            <Award className="w-4 h-4 text-orange-500" />
+                            <span className="text-sm font-medium">综合能力画像</span>
                         </Button>
 
                         {/* 设置入口 */}

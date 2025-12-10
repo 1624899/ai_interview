@@ -144,7 +144,7 @@ class CandidateAnalysisService:
         prompt = f"""你是一位资深的技术面试官和人才评估专家。请对候选人进行全面、客观的多维度能力分析。
 
 【简历信息】：
-{context.resume[:1500]}
+{context.resume}
 
 【岗位要求】：
 {context.job_description}
@@ -184,7 +184,8 @@ class CandidateAnalysisService:
    - 团队合作意识，换位思考能力。
    - 评分 0-10，需提供证据。
 
-此外，请提取用户的**技能标签 (skill_tags)**（如：Java, Spring Boot, MySQL, 分布式系统等）。
+【技能标签】：
+请提取用户最突出、最稳定的技能标签（如：Java, System Design, React 等），限制在 5-10 个。
 
 【输出格式】：
 请**直接输出纯 JSON 格式**，不要用 markdown 代码块包裹。JSON 结构如下：

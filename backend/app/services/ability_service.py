@@ -150,7 +150,7 @@ class AbilityAnalysisService:
 6. **协作能力 (collaboration)**：团队合作意识和换位思考
 
 【技能标签】：
-请提取用户最突出、最稳定的技能标签（如：Java, System Design, React 等），限制在 5-8 个。
+请提取用户最突出、最稳定的技能标签（如：Java, System Design, React 等），限制在 5-10 个。
 
 【输出格式】：
 请**直接输出纯 JSON 格式**，不要用 markdown 代码块包裹。

@@ -31,6 +31,7 @@ export interface SessionMetadata {
     max_questions: number;
     status: 'active' | 'completed' | 'archived';
     pinned?: boolean;
+    round_index?: number;
 }
 
 export interface InterviewSession {
@@ -712,12 +713,26 @@ export const useInterviewStore = create<InterviewStore>()(
                                         try {
                                             const stateData = JSON.parse(data.content);
                                             if (stateData.question_count !== undefined) {
-                                                set({
+                                                const questionCount = stateData.question_count;
+                                                const maxQs = stateData.max_questions || get().maxQuestions;
+
+                                                set((state) => ({
                                                     interviewProgress: {
-                                                        current: stateData.question_count,
-                                                        total: stateData.max_questions || get().maxQuestions,
+                                                        current: questionCount,
+                                                        total: maxQs,
                                                     },
-                                                });
+                                                    // 当问题数达到最大值时，更新会话状态为 completed
+                                                    currentSession: state.currentSession && questionCount >= maxQs
+                                                        ? {
+                                                            ...state.currentSession,
+                                                            metadata: {
+                                                                ...state.currentSession.metadata,
+                                                                status: 'completed',
+                                                                question_count: questionCount,
+                                                            },
+                                                        }
+                                                        : state.currentSession,
+                                                }));
                                             }
                                         } catch (e) {
                                         }
@@ -792,8 +807,19 @@ export const useInterviewStore = create<InterviewStore>()(
 
                     if (!response.ok) throw new Error('回退失败');
 
-                    // 截断本地消息
-                    set({ messages: messages.slice(0, toIndex) });
+                    // 截断本地消息，并重置会话状态为 active
+                    set((state) => ({
+                        messages: messages.slice(0, toIndex),
+                        currentSession: state.currentSession
+                            ? {
+                                ...state.currentSession,
+                                metadata: {
+                                    ...state.currentSession.metadata,
+                                    status: 'active',
+                                },
+                            }
+                            : null,
+                    }));
                 } catch (error) {
                     console.error('回退错误:', error);
                     throw error;

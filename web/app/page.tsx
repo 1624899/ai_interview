@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SessionSidebar } from "@/components/SessionSidebar";
 import { AbilityProfileView } from "@/components/AbilityProfileView";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import { SessionProfileDialog } from "@/components/SessionProfileDialog";
 import { useInterviewStore } from "@/store/useInterviewStore";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { getUserId } from "@/hooks/useUserIdentity";
@@ -34,6 +35,7 @@ export default function InterviewPage() {
   const [interviewStartTime, setInterviewStartTime] = useState<string>("");
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const [showSessionProfileDialog, setShowSessionProfileDialog] = useState(false);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -590,134 +592,159 @@ export default function InterviewPage() {
                       <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-200">
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex-1">
-                            <h4 className="font-semibold text-gray-900 mb-1">面试已完成！</h4>
-                            <p className="text-sm text-gray-600">
-                              继续进行下一轮面试，深入考察您的专业能力
-                            </p>
+                            {/* 判断是否为最后一轮（第3轮） */}
+                            {(currentSession.metadata.round_index ?? 1) >= 3 ? (
+                              <>
+                                <h4 className="font-semibold text-gray-900 mb-1">🎉 所有面试已结束！</h4>
+                                <p className="text-sm text-gray-600">
+                                  恭喜您完成了全部 3 轮面试，点击查看本轮能力画像
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <h4 className="font-semibold text-gray-900 mb-1">面试已完成！</h4>
+                                <p className="text-sm text-gray-600">
+                                  继续进行下一轮面试，深入考察您的专业能力
+                                </p>
+                              </>
+                            )}
                           </div>
                           <div className="flex items-center gap-3">
-                            <select
-                              id="next-round-questions"
-                              className="h-9 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                              defaultValue={5}
-                              onChange={(e) => {
-                                // 更新全局状态中的 maxQuestions
-                                useInterviewStore.setState({ maxQuestions: parseInt(e.target.value) });
-                              }}
-                            >
-                              {[3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                                <option key={n} value={n}>{n} 道题</option>
-                              ))}
-                            </select>
                             <Button
-                              onClick={async () => {
-                                try {
-                                  // 从 store 获取最新的题目数量
-                                  const nextRoundQuestions = useInterviewStore.getState().maxQuestions;
-
-                                  // 设置加载状态，清空消息以显示加载动画
-                                  useInterviewStore.setState({
-                                    isLoading: true,
-                                    isStreaming: true,
-                                    messages: [],
-                                    interviewProgress: { current: 0, total: nextRoundQuestions }
-                                  });
-
-                                  // 1. 创建下一轮会话
-                                  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/sessions/${currentSession.session_id}/next-round`, {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      'X-User-ID': getUserId()
-                                    },
-                                    body: JSON.stringify({
-                                      max_questions: nextRoundQuestions
-                                    })
-                                  });
-
-                                  if (!response.ok) {
-                                    const error = await response.json();
-                                    throw new Error(error.message || '创建下一轮失败');
-                                  }
-
-                                  const data = await response.json();
-                                  const newSessionId = data.session.session_id;
-
-                                  // 2. 刷新会话列表并选择新会话
-                                  await fetchSessions(undefined, 'mock');
-                                  await selectSession(newSessionId);
-
-                                  // 3. 直接调用 /chat/start，后端会从数据库加载继承的简历/JD
-                                  const apiConfig = useInterviewStore.getState().getApiConfigForRequest();
-                                  if (!apiConfig) {
-                                    throw new Error('请先配置 API');
-                                  }
-
-                                  const startResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/start`, {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      'X-User-ID': getUserId()
-                                    },
-                                    body: JSON.stringify({
-                                      thread_id: newSessionId,
-                                      mode: 'mock',
-                                      max_questions: nextRoundQuestions,
-                                      api_config: apiConfig,
-                                    })
-                                  });
-
-                                  if (!startResponse.ok) {
-                                    throw new Error('启动面试失败');
-                                  }
-
-                                  // 4. 处理流式响应
-                                  const reader = startResponse.body?.getReader();
-                                  if (reader) {
-                                    const decoder = new TextDecoder();
-                                    let buffer = '';
-
-                                    while (true) {
-                                      const { done, value } = await reader.read();
-                                      if (done) {
-                                        if (buffer.trim()) {
-                                          try {
-                                            const jsonData = JSON.parse(buffer);
-                                            if (jsonData.first_question) {
-                                              useInterviewStore.setState({
-                                                messages: [{
-                                                  role: 'ai',
-                                                  content: jsonData.first_question,
-                                                  timestamp: new Date().toISOString(),
-                                                }],
-                                                isLoading: false,
-                                                isStreaming: false,
-                                              });
-                                            }
-                                          } catch { }
-                                        }
-                                        break;
-                                      }
-                                      buffer += decoder.decode(value, { stream: true });
-                                    }
-                                  }
-
-                                } catch (error) {
-                                  console.error('创建下一轮失败:', error);
-                                  toast.error((error as Error).message || '创建下一轮失败');
-                                  useInterviewStore.setState({ isLoading: false, isStreaming: false });
-                                }
-                              }}
-                              disabled={isLoading || isStreaming}
-                              className="bg-teal-600 hover:bg-teal-700 text-white gap-2 disabled:opacity-50"
+                              variant="outline"
+                              onClick={() => setShowSessionProfileDialog(true)}
+                              className="gap-2"
                             >
-                              {isLoading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Plus className="w-4 h-4" />
-                              )}
-                              {isLoading ? '准备中...' : '开启下一轮'}
+                              <Award className="w-4 h-4 text-pink-500" />
+                              本轮能力画像
                             </Button>
+                            {/* 仅在非最后一轮时显示下一轮选项 */}
+                            {(currentSession.metadata.round_index ?? 1) < 3 && (
+                              <>
+                                <select
+                                  id="next-round-questions"
+                                  className="h-9 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                  defaultValue={5}
+                                  onChange={(e) => {
+                                    // 更新全局状态中的 maxQuestions
+                                    useInterviewStore.setState({ maxQuestions: parseInt(e.target.value) });
+                                  }}
+                                >
+                                  {[3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                                    <option key={n} value={n}>{n} 道题</option>
+                                  ))}
+                                </select>
+                                <Button
+                                  onClick={async () => {
+                                    try {
+                                      // 从 store 获取最新的题目数量
+                                      const nextRoundQuestions = useInterviewStore.getState().maxQuestions;
+
+                                      // 设置加载状态，清空消息以显示加载动画
+                                      useInterviewStore.setState({
+                                        isLoading: true,
+                                        isStreaming: true,
+                                        messages: [],
+                                        interviewProgress: { current: 0, total: nextRoundQuestions }
+                                      });
+
+                                      // 1. 创建下一轮会话
+                                      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/sessions/${currentSession.session_id}/next-round`, {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'X-User-ID': getUserId()
+                                        },
+                                        body: JSON.stringify({
+                                          max_questions: nextRoundQuestions
+                                        })
+                                      });
+
+                                      if (!response.ok) {
+                                        const error = await response.json();
+                                        throw new Error(error.message || '创建下一轮失败');
+                                      }
+
+                                      const data = await response.json();
+                                      const newSessionId = data.session.session_id;
+
+                                      // 2. 刷新会话列表并选择新会话
+                                      await fetchSessions(undefined, 'mock');
+                                      await selectSession(newSessionId);
+
+                                      // 3. 直接调用 /chat/start，后端会从数据库加载继承的简历/JD
+                                      const apiConfig = useInterviewStore.getState().getApiConfigForRequest();
+                                      if (!apiConfig) {
+                                        throw new Error('请先配置 API');
+                                      }
+
+                                      const startResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/start`, {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'X-User-ID': getUserId()
+                                        },
+                                        body: JSON.stringify({
+                                          thread_id: newSessionId,
+                                          mode: 'mock',
+                                          max_questions: nextRoundQuestions,
+                                          api_config: apiConfig,
+                                        })
+                                      });
+
+                                      if (!startResponse.ok) {
+                                        throw new Error('启动面试失败');
+                                      }
+
+                                      // 4. 处理流式响应
+                                      const reader = startResponse.body?.getReader();
+                                      if (reader) {
+                                        const decoder = new TextDecoder();
+                                        let buffer = '';
+
+                                        while (true) {
+                                          const { done, value } = await reader.read();
+                                          if (done) {
+                                            if (buffer.trim()) {
+                                              try {
+                                                const jsonData = JSON.parse(buffer);
+                                                if (jsonData.first_question) {
+                                                  useInterviewStore.setState({
+                                                    messages: [{
+                                                      role: 'ai',
+                                                      content: jsonData.first_question,
+                                                      timestamp: new Date().toISOString(),
+                                                    }],
+                                                    isLoading: false,
+                                                    isStreaming: false,
+                                                  });
+                                                }
+                                              } catch { }
+                                            }
+                                            break;
+                                          }
+                                          buffer += decoder.decode(value, { stream: true });
+                                        }
+                                      }
+
+                                    } catch (error) {
+                                      console.error('创建下一轮失败:', error);
+                                      toast.error((error as Error).message || '创建下一轮失败');
+                                      useInterviewStore.setState({ isLoading: false, isStreaming: false });
+                                    }
+                                  }}
+                                  disabled={isLoading || isStreaming}
+                                  className="bg-teal-600 hover:bg-teal-700 text-white gap-2 disabled:opacity-50"
+                                >
+                                  {isLoading ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Plus className="w-4 h-4" />
+                                  )}
+                                  {isLoading ? '准备中...' : '开启下一轮'}
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -827,6 +854,15 @@ export default function InterviewPage() {
         open={showSettingsDialog}
         onOpenChange={setShowSettingsDialog}
       />
+
+      {/* 本轮能力画像弹窗 */}
+      {currentSession && (
+        <SessionProfileDialog
+          sessionId={currentSession.session_id}
+          open={showSessionProfileDialog}
+          onOpenChange={setShowSessionProfileDialog}
+        />
+      )}
 
       {/* Toast 提示 */}
       <Toaster position="top-center" richColors closeButton />

@@ -597,3 +597,42 @@ async def get_overall_profile(
                 "message": "获取综合能力画像失败"
             }
         )
+
+
+@router.get("/profile/session/{session_id}")
+async def get_session_profile(
+    session_id: str,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
+    """
+    获取单个会话的能力画像
+    
+    Args:
+        session_id: 会话ID
+        
+    Returns:
+        dict: 画像数据或生成中提示
+    """
+    try:
+        profile = await session_service.get_profile(session_id)
+        
+        if profile is None:
+            return {
+                "success": False,
+                "message": "画像生成中，请稍后刷新"
+            }
+        
+        return {
+            "success": True,
+            "profile": profile
+        }
+        
+    except Exception as e:
+        logger.error(f"获取会话画像失败: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "InternalServerError",
+                "message": "获取会话画像失败"
+            }
+        )

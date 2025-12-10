@@ -293,7 +293,7 @@ async def node_responder(state: InterviewState):
 
 候选人刚回答了以下问题：
 问题：{current_question}
-回答：{user_response[:800]}
+回答：{user_response}
 
 请生成一句简短的评价（一句话即可，不要深入点评），然后自然地引出下一道题目。
 

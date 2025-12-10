@@ -64,14 +64,14 @@ class AbilityAnalysisService:
                 raise ValueError(f"生成过于频繁，请等待 {remaining} 秒后再试")
                 
             try:
-                # 3. 获取最近5次画像（只获取当前用户的）
-                recent_profiles = await self.session_service.get_recent_profiles(limit=5, user_id=user_id)
+                # 3. 获取最近5个面试系列的最后一轮画像（避免同一系列重复计入）
+                recent_profiles = await self.session_service.get_series_final_profiles(limit=5, user_id=user_id)
                 
                 if not recent_profiles:
                     logger.warning("无历史面试记录，无法生成综合画像")
                     return {"profile": self._get_empty_profile()}
                 
-                logger.info(f"开始聚合分析，共 {len(recent_profiles)} 次面试记录")
+                logger.info(f"开始聚合分析，共 {len(recent_profiles)} 个面试系列的画像")
                     
                 # 4. 调用 LLM 进行时间加权聚合分析
                 profile = await self._aggregate_profiles_with_weights(recent_profiles, api_config)
@@ -130,9 +130,9 @@ class AbilityAnalysisService:
         # 构建带权重的上下文
         profiles_context = json.dumps(weighted_profiles, ensure_ascii=False, indent=2)
         
-        prompt = f"""你是一位资深的人才评估专家。请根据用户最近 {len(profiles)} 次的面试评估记录，生成一份综合的能力画像。
+        prompt = f"""你是一位资深的人才评估专家。请根据用户最近 {len(profiles)} 个面试系列的最终评估记录，生成一份综合的能力画像。
 
-【历史评估记录】（按时间倒序，最新在前）：
+【历史评估记录】（按时间倒序，最新在前，每条记录代表一个面试系列的最终轮次）：
 {profiles_context}
 
 【分析策略】：

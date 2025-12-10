@@ -601,64 +601,46 @@ class SessionService:
 
     async def get_series_final_profiles(self, limit: int = 5, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        获取每个面试系列的最后一轮画像（用于综合能力聚合）
+        获取每条面试路径的终点画像（用于综合能力聚合）
         
         逻辑：
-        1. 将会话按系列分组（通过 parent_session_id 或 session_id 确定根）
-        2. 每个系列取 round_index 最大的那个会话
-        3. 按更新时间倒序，取最近 limit 个系列
+        1. 找到"叶子节点"：没有其他会话以它为 parent_session_id 的会话
+        2. 每个叶子节点代表一条独立路径的终点
+        3. 按更新时间倒序，取最近 limit 个
+        
+        示例：
+        A(第1轮) → B(第2轮) → C(第3轮)  ← C 是叶子
+        A(第1轮) → D(第2轮)              ← D 是叶子
+        结果：取 C 和 D 的画像
         
         Args:
-            limit: 最多返回多少个系列的画像
+            limit: 最多返回多少个画像
             user_id: 用户ID过滤
             
         Returns:
             List[Dict]: 画像列表
         """
         async with db_manager.get_connection() as conn:
-            # 使用 CTE 找到每个系列的最后一轮
-            sql = '''
-                WITH series_roots AS (
-                    -- 确定每个会话所属的系列根ID
-                    SELECT 
-                        session_id,
-                        COALESCE(parent_session_id, session_id) as root_id,
-                        round_index,
-                        updated_at,
-                        candidate_profile,
-                        user_id
-                    FROM sessions
-                    WHERE candidate_profile IS NOT NULL
-            '''
-            
             params = []
             param_idx = 1
             
+            # 基础查询：找叶子节点（没有子节点指向它的会话）
+            sql = '''
+                SELECT s.candidate_profile, s.updated_at
+                FROM sessions s
+                WHERE s.candidate_profile IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM sessions child 
+                      WHERE child.parent_session_id = s.session_id
+                  )
+            '''
+            
             if user_id:
-                sql += f' AND user_id = ${param_idx}'
+                sql += f' AND s.user_id = ${param_idx}'
                 params.append(user_id)
                 param_idx += 1
             
-            sql += '''
-                ),
-                series_max AS (
-                    -- 找到每个系列的最大 round_index
-                    SELECT root_id, MAX(round_index) as max_round
-                    FROM series_roots
-                    GROUP BY root_id
-                ),
-                final_rounds AS (
-                    -- 获取每个系列最后一轮的会话
-                    SELECT sr.session_id, sr.candidate_profile, sr.updated_at
-                    FROM series_roots sr
-                    JOIN series_max sm ON sr.root_id = sm.root_id AND sr.round_index = sm.max_round
-                )
-                SELECT candidate_profile, updated_at
-                FROM final_rounds
-                ORDER BY updated_at DESC
-            '''
-            
-            sql += f' LIMIT ${param_idx}'
+            sql += f' ORDER BY s.updated_at DESC LIMIT ${param_idx}'
             params.append(limit)
             
             rows = await conn.fetch(sql, *params)
@@ -672,7 +654,7 @@ class SessionService:
                     else:
                         profiles.append(profile)
             
-            logger.info(f"获取到 {len(profiles)} 个系列的最终轮次画像")
+            logger.info(f"获取到 {len(profiles)} 个路径终点的画像（叶子节点）")
             return profiles
 
     async def save_user_profile(self, profile_data: Dict[str, Any], user_id: str = "default_user") -> bool:

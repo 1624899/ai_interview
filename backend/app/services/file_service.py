@@ -2,7 +2,7 @@ import os
 import logging
 from typing import List
 from fastapi import UploadFile
-from pypdf import PdfReader
+import fitz # pymupdf
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -50,23 +50,28 @@ class FileService:
         return file_size <= self.max_file_size_bytes
     
     def extract_text_from_pdf(self, file_path: str) -> str:
-        """解析 PDF 文件（使用 pypdf）"""
+        """解析 PDF 文件（使用 PyMuPDF）"""
         try:
             logger.info(f"开始解析 PDF: {file_path}")
-            reader = PdfReader(file_path)
+            doc = fitz.open(file_path)
             pages_text = []
-            for page in reader.pages:
-                text = page.extract_text()
+            
+            for page in doc:
+                # 使用 sort=True 按照从上到下、从左到右的顺序提取文本
+                text = page.get_text(sort=True)
                 if text:
                     pages_text.append(text)
             
             full_text = "\n\n".join(pages_text)
             
+            doc.close()
+
             if not full_text.strip():
                 raise ValueError("PDF 解析成功但内容为空")
             
             logger.info(f"PDF 解析成功，提取文本长度: {len(full_text)} 字符")
             return full_text
+            
         except Exception as e:
             logger.error(f"PDF 解析失败: {str(e)}")
             raise FileServiceError(f"PDF 解析失败: {str(e)}")

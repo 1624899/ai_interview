@@ -9,7 +9,6 @@ import asyncio
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-from app.core.llms import get_smart_llm
 from app.database.session_service import SessionService
 from app.models.candidate_profile import CandidateProfile, DimensionScore
 
@@ -19,7 +18,6 @@ class AbilityAnalysisService:
     """能力画像聚合服务 - 基于数据库存储"""
     
     def __init__(self):
-        self.smart_llm = get_smart_llm()
         self.session_service = SessionService()
         self._generate_lock = asyncio.Lock()
         self._last_generate_time = {}  # user_id -> timestamp

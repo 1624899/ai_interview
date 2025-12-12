@@ -74,6 +74,36 @@ async def init_database():
         ''')
         logger.info("✓ user_profile 表已创建/验证")
         
+        # 创建简历优化/分析结果表
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS resume_results (
+                id SERIAL PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                result_type TEXT NOT NULL,
+                resume_content TEXT NOT NULL,
+                job_description TEXT,
+                session_ids JSONB,
+                include_profile BOOLEAN DEFAULT FALSE,
+                result_data JSONB NOT NULL,
+                created_at TIMESTAMP NOT NULL
+            )
+        ''')
+        logger.info("✓ resume_results 表已创建/验证")
+        
+        # 创建生成的简历表
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS generated_resumes (
+                id SERIAL PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                optimization_result_id INTEGER,
+                job_description TEXT,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP NOT NULL
+            )
+        ''')
+        logger.info("✓ generated_resumes 表已创建/验证")
+        
         # ====================================================================
         # 索引创建
         # ====================================================================
@@ -124,6 +154,23 @@ async def init_database():
         await conn.execute('''
             CREATE INDEX IF NOT EXISTS idx_message_timestamp 
             ON messages(timestamp DESC)
+        ''')
+        
+        # 简历结果表索引
+        await conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_resume_results_user 
+            ON resume_results(user_id, created_at DESC)
+        ''')
+        
+        await conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_resume_results_type 
+            ON resume_results(result_type)
+        ''')
+        
+        # 生成的简历表索引
+        await conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_generated_resumes_user 
+            ON generated_resumes(user_id, created_at DESC)
         ''')
         
         logger.info("✓ 所有索引已创建/验证")

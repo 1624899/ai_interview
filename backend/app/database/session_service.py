@@ -698,6 +698,106 @@ class SessionService:
                 }
             return None
 
+    async def get_session_conversations(
+        self,
+        session_id: str,
+        user_id: Optional[str] = None
+    ) -> List[Dict[str, str]]:
+        """
+        获取会话的完整对话内容（用于简历优化参考）
+        
+        Args:
+            session_id: 会话ID
+            user_id: 用户ID（用于权限校验）
+            
+        Returns:
+            QA 对列表，格式为 [{"question": "...", "answer": "..."}, ...]
+        """
+        async with db_manager.get_connection() as conn:
+            # 权限校验
+            if not await self._check_session_access(conn, session_id, user_id):
+                return []
+            
+            # 获取所有消息
+            rows = await conn.fetch('''
+                SELECT role, content
+                FROM messages
+                WHERE session_id = $1
+                ORDER BY timestamp ASC
+            ''', session_id)
+            
+            # 解析 QA 对
+            qa_pairs = []
+            for i in range(len(rows) - 1):
+                msg = rows[i]
+                next_msg = rows[i + 1]
+                
+                # 寻找 "AI提问 -> User回答" 的模式
+                if msg['role'] == 'ai' and next_msg['role'] == 'user':
+                    question = msg['content'].strip()
+                    answer = next_msg['content'].strip()
+                    
+                    if question and answer:
+                        qa_pairs.append({
+                            "question": question,
+                            "answer": answer
+                        })
+            
+            logger.info(f"获取会话 {session_id} 的对话内容，共 {len(qa_pairs)} 个 QA 对")
+            return qa_pairs
+
+    async def get_completed_sessions_for_resume(
+        self,
+        user_id: Optional[str] = None,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        获取可用于简历优化的已完成会话列表
+        
+        Args:
+            user_id: 用户ID
+            limit: 最大返回数量
+            
+        Returns:
+            已完成会话列表
+        """
+        async with db_manager.get_connection() as conn:
+            sql = '''
+                SELECT 
+                    s.session_id, s.title, s.updated_at, s.round_index, s.round_type,
+                    (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.session_id) as message_count
+                FROM sessions s
+                WHERE s.status = 'completed'
+            '''
+            params = []
+            param_idx = 1
+            
+            if user_id:
+                sql += f' AND s.user_id = ${param_idx}'
+                params.append(user_id)
+                param_idx += 1
+            
+            sql += f' ORDER BY s.updated_at DESC LIMIT ${param_idx}'
+            params.append(limit)
+            
+            rows = await conn.fetch(sql, *params)
+            
+            sessions = []
+            for row in rows:
+                updated_at = row['updated_at']
+                sessions.append({
+                    'session_id': row['session_id'],
+                    'title': row['title'],
+                    'updated_at': updated_at.isoformat() if isinstance(updated_at, datetime) else updated_at,
+                    'round_index': row['round_index'] or 1,
+                    'round_type': row['round_type'] or 'tech_initial',
+                    'message_count': row['message_count']
+                })
+            
+            logger.info(f"获取已完成会话列表，共 {len(sessions)} 个")
+            return sessions
+
 
 # 创建全局实例
 session_service = SessionService()
+

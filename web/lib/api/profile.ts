@@ -2,8 +2,7 @@
  * 能力画像 API 接口
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-import { getUserId } from '@/hooks/useUserIdentity';
+import { API_BASE_URL, getUserId } from './config';
 
 // 维度评分接口
 export interface DimensionScore {

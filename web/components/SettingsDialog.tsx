@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Plus, Eye, EyeOff, Check, X, Loader2, AlertCircle, Trash2, Brain, Zap, ChevronLeft, Edit2, ChevronDown } from 'lucide-react';
+import { Settings, Plus, Eye, EyeOff, Check, Loader2, AlertCircle, Brain, Zap, ChevronLeft, ChevronDown, FileText, Users, PenTool, UserCheck, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -336,7 +336,13 @@ export function SettingsDialog({
         updateModel: onUpdateModel,
         deleteModel: onDeleteModel,
         setSmartModel: onSetSmartModel,
-        setFastModel: onSetFastModel
+        setFastModel: onSetFastModel,
+        // 简历工具专家模型
+        setGeneralModel: onSetGeneralModel,
+        setMatchAnalystModel: onSetMatchAnalystModel,
+        setContentWriterModel: onSetContentWriterModel,
+        setHrReviewerModel: onSetHrReviewerModel,
+        setReflectorModel: onSetReflectorModel
     } = useInterviewStore();
     const [showModelForm, setShowModelForm] = useState(false);
     const [editingModel, setEditingModel] = useState<ModelConfig | undefined>();
@@ -429,57 +435,187 @@ export function SettingsDialog({
 
                         {/* 模型配置区域 - 下拉选择 */}
                         {config.models.length > 0 && (
-                            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-4">
-                                <label className="text-sm font-medium text-gray-700">模型配置</label>
+                            <>
+                                <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-4">
+                                    <label className="text-sm font-medium text-gray-700">面试功能模型配置</label>
 
-                                {/* Smart 通道选择 */}
-                                <div className="space-y-2">
-                                    <label className="flex items-center gap-2 text-sm text-gray-600">
-                                        <Brain className="w-4 h-4 text-purple-500" />
-                                        Smart
-                                        <span className="text-xs text-gray-400">（复杂任务：规划、总结）</span>
-                                    </label>
-                                    <div className="relative">
-                                        <select
-                                            value={config.smartModelId}
-                                            onChange={(e) => onSetSmartModel(e.target.value)}
-                                            className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
-                                        >
-                                            <option value="">选择模型</option>
-                                            {config.models.map((model) => (
-                                                <option key={model.id} value={model.id}>
-                                                    {model.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                    {/* Smart 通道选择 */}
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                                            <Brain className="w-4 h-4 text-purple-500" />
+                                            Smart
+                                            <span className="text-xs text-gray-400">（复杂任务：规划、总结）</span>
+                                        </label>
+                                        <div className="relative">
+                                            <select
+                                                value={config.smartModelId}
+                                                onChange={(e) => onSetSmartModel(e.target.value)}
+                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                            >
+                                                <option value="">选择模型</option>
+                                                {config.models.map((model) => (
+                                                    <option key={model.id} value={model.id}>
+                                                        {model.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        </div>
+                                    </div>
+
+                                    {/* Fast 通道选择 */}
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                                            <Zap className="w-4 h-4 text-amber-500" />
+                                            Fast
+                                            <span className="text-xs text-gray-400">（快速响应：问答、点评）</span>
+                                        </label>
+                                        <div className="relative">
+                                            <select
+                                                value={config.fastModelId}
+                                                onChange={(e) => onSetFastModel(e.target.value)}
+                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                            >
+                                                <option value="">选择模型</option>
+                                                {config.models.map((model) => (
+                                                    <option key={model.id} value={model.id}>
+                                                        {model.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Fast 通道选择 */}
-                                <div className="space-y-2">
-                                    <label className="flex items-center gap-2 text-sm text-gray-600">
-                                        <Zap className="w-4 h-4 text-amber-500" />
-                                        Fast
-                                        <span className="text-xs text-gray-400">（快速响应：问答、点评）</span>
+                                {/* 简历工具专家模型配置 */}
+                                <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-4">
+                                    <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                        <FileText className="w-4 h-4 text-teal-600" />
+                                        简历工具模型配置
                                     </label>
-                                    <div className="relative">
-                                        <select
-                                            value={config.fastModelId}
-                                            onChange={(e) => onSetFastModel(e.target.value)}
-                                            className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
-                                        >
-                                            <option value="">选择模型</option>
-                                            {config.models.map((model) => (
-                                                <option key={model.id} value={model.id}>
-                                                    {model.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+
+                                    {/* 通用任务（简历分析 + 主持人） */}
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                                            <Brain className="w-4 h-4 text-indigo-500" />
+                                            通用任务
+                                            <span className="text-xs text-gray-400">（简历分析、主持人）</span>
+                                        </label>
+                                        <div className="relative">
+                                            <select
+                                                value={config.generalModelId || ''}
+                                                onChange={(e) => onSetGeneralModel(e.target.value)}
+                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                            >
+                                                <option value="">选择模型</option>
+                                                {config.models.map((model) => (
+                                                    <option key={model.id} value={model.id}>
+                                                        {model.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        </div>
+                                    </div>
+
+                                    {/* 匹配分析师 */}
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                                            <Users className="w-4 h-4 text-blue-500" />
+                                            匹配分析师
+                                            <span className="text-xs text-gray-400">（JD关键词匹配）</span>
+                                        </label>
+                                        <div className="relative">
+                                            <select
+                                                value={config.matchAnalystModelId || ''}
+                                                onChange={(e) => onSetMatchAnalystModel(e.target.value)}
+                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                            >
+                                                <option value="">选择模型</option>
+                                                {config.models.map((model) => (
+                                                    <option key={model.id} value={model.id}>
+                                                        {model.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        </div>
+                                    </div>
+
+                                    {/* 内容优化师 */}
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                                            <PenTool className="w-4 h-4 text-green-500" />
+                                            内容优化师
+                                            <span className="text-xs text-gray-400">（内容重写建议）</span>
+                                        </label>
+                                        <div className="relative">
+                                            <select
+                                                value={config.contentWriterModelId || ''}
+                                                onChange={(e) => onSetContentWriterModel(e.target.value)}
+                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                            >
+                                                <option value="">选择模型</option>
+                                                {config.models.map((model) => (
+                                                    <option key={model.id} value={model.id}>
+                                                        {model.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        </div>
+                                    </div>
+
+                                    {/* HR审核官 */}
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                                            <UserCheck className="w-4 h-4 text-orange-500" />
+                                            HR审核官
+                                            <span className="text-xs text-gray-400">（模拟HR筛选）</span>
+                                        </label>
+                                        <div className="relative">
+                                            <select
+                                                value={config.hrReviewerModelId || ''}
+                                                onChange={(e) => onSetHrReviewerModel(e.target.value)}
+                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                            >
+                                                <option value="">选择模型</option>
+                                                {config.models.map((model) => (
+                                                    <option key={model.id} value={model.id}>
+                                                        {model.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        </div>
+                                    </div>
+
+                                    {/* 质量审核 */}
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                                            <CheckCircle className="w-4 h-4 text-purple-500" />
+                                            质量审核
+                                            <span className="text-xs text-gray-400">（最终检查）</span>
+                                        </label>
+                                        <div className="relative">
+                                            <select
+                                                value={config.reflectorModelId || ''}
+                                                onChange={(e) => onSetReflectorModel(e.target.value)}
+                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                            >
+                                                <option value="">选择模型</option>
+                                                {config.models.map((model) => (
+                                                    <option key={model.id} value={model.id}>
+                                                        {model.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            </>
                         )}
 
                         {/* 空状态提示 */}

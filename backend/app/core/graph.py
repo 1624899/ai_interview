@@ -40,7 +40,7 @@ def clear_graph_instances():
     """清空图实例列表"""
     _graph_instances.clear()
 
-llm = llms.get_smart_llm()
+
 
 class InterviewQuestion(BaseModel):
     """面试问题数据模型"""

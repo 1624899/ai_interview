@@ -20,9 +20,16 @@ class ModelChannelConfig(BaseModel):
 
 
 class ApiConfig(BaseModel):
-    """用户自定义的 API 配置 - 支持双通道独立配置"""
+    """用户自定义的 API 配置 - 支持多通道独立配置"""
     smart: ModelChannelConfig = Field(..., description="Smart 通道配置（复杂任务）")
     fast: ModelChannelConfig = Field(..., description="Fast 通道配置（快速响应）")
+    # 简历工具专家通道（可选，未配置时回退到 smart）
+    general: Optional[ModelChannelConfig] = Field(default=None, description="通用任务通道（简历分析、主持人）")
+    match_analyst: Optional[ModelChannelConfig] = Field(default=None, description="匹配分析师通道")
+    content_writer: Optional[ModelChannelConfig] = Field(default=None, description="内容优化师通道")
+    hr_reviewer: Optional[ModelChannelConfig] = Field(default=None, description="HR审核官通道")
+    reflector: Optional[ModelChannelConfig] = Field(default=None, description="质量审核通道")
+
 
 
 # ============================================================================

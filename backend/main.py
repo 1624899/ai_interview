@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import chat, upload, sessions, config
+from app.api import chat, upload, sessions, config, resume
 from app.models.schemas import ErrorResponse
 from app.database import db_manager
 
@@ -205,6 +205,7 @@ app.include_router(chat.router)
 app.include_router(upload.router)
 app.include_router(sessions.router)
 app.include_router(config.router)
+app.include_router(resume.router)
 
 
 # 启动信息

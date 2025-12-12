@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { PanelLeft, Bot, Sparkles, AlertCircle, Loader2, X, Upload, FileText, GraduationCap, Timer, Maximize2, Square, ArrowDown, Mic, Award, Plus } from "lucide-react";
+import { PanelLeft, Bot, Sparkles, AlertCircle, Loader2, X, Upload, FileText, GraduationCap, Timer, Maximize2, Square, ArrowDown, Mic, Award, Plus, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ChatMessage";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +14,7 @@ import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { getUserId } from "@/hooks/useUserIdentity";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster, toast } from "sonner";
 import {
   Dialog,
@@ -23,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResumeTools } from "@/components/ResumeTools";
 
 export default function InterviewPage() {
   // ===== 局部 UI 状态 =====
@@ -36,6 +38,19 @@ export default function InterviewPage() {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [showSessionProfileDialog, setShowSessionProfileDialog] = useState(false);
+  const [activeMainTab, setActiveMainTab] = useState<"interview" | "resume">("interview");
+
+  // 持久化视图状态
+  useEffect(() => {
+    const savedTab = localStorage.getItem("activeMainTab");
+    if (savedTab === "resume" || savedTab === "interview") {
+      setActiveMainTab(savedTab);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("activeMainTab", activeMainTab);
+  }, [activeMainTab]);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -258,27 +273,61 @@ export default function InterviewPage() {
         isOpen={showSidebar}
         onClose={() => setShowSidebar(false)}
         onOpenSettings={() => setShowSettingsDialog(true)}
+        currentView={activeMainTab}
+        onViewChange={setActiveMainTab}
       />
 
       {/* 主内容区域 */}
       <main className="flex-1 flex flex-col h-full relative bg-white overflow-hidden">
 
-        {/* 顶部导航栏 (仅在侧边栏关闭或移动端显示) */}
-        {!showSidebar && (
-          <div className="absolute top-4 left-4 z-50">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowSidebar(true)}
-              className="hover:bg-gray-100 text-gray-500"
-            >
-              <PanelLeft className="w-5 h-5" />
-            </Button>
+        {/* 顶部导航栏 */}
+        <div className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
+          <div className="mx-auto px-6 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {!showSidebar && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowSidebar(true)}
+                  className="hover:bg-gray-100 text-gray-500"
+                >
+                  <PanelLeft className="w-5 h-5" />
+                </Button>
+              )}
+
+              {/* 标题 */}
+              <div className="flex items-center gap-2 font-medium text-gray-700">
+                {activeMainTab === "interview" ? (
+                  <>
+                    <MessageCircle size={18} className="text-teal-600" />
+                    <span>模拟面试</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText size={18} className="text-teal-600" />
+                    <span>简历工具</span>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
-        )}
+        </div>
 
         {/* 视图切换逻辑 */}
-        {showAbilityProfile ? (
+        {activeMainTab === "resume" ? (
+          /* 简历工具视图 */
+          <div className="flex-1 overflow-hidden p-6">
+            <div className="max-w-6xl mx-auto h-full">
+              <ResumeTools
+                apiConfig={hasApiConfig ? useInterviewStore.getState().getApiConfigForRequest() : null}
+                resumeContent={resume?.content || ""}
+                onResumeChange={(content) => {
+                  // 可以同步简历内容到 store，但这里简化处理
+                }}
+              />
+            </div>
+          </div>
+        ) : showAbilityProfile ? (
           // 能力画像视图
           <div className="flex-1 flex flex-col h-full relative">
             <div className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
@@ -306,7 +355,7 @@ export default function InterviewPage() {
             {/* 背景装饰 */}
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-teal-50/50 via-white to-white pointer-events-none" />
 
-            <div className="w-full max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
+            <div className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
               {/* 左侧：介绍 */}
               <div className="space-y-8">
                 <div className="space-y-4">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { PanelLeft, Bot, Loader2, Award, Plus, MessageCircle, FileText, Timer } from "lucide-react";
+import { PanelLeft, Bot, Loader2, Award, Plus, MessageCircle, FileText, ArrowDown, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ChatMessage";
 import { SessionSidebar } from "@/components/SessionSidebar";
@@ -30,7 +30,7 @@ export default function InterviewPage() {
   const [isMounted, setIsMounted] = useState(false);
   // const [isJobDialogOpen, setIsJobDialogOpen] = useState(false); // Moved to InterviewSetup
   // const [tempJobDescription, setTempJobDescription] = useState(""); // Moved to InterviewSetup
-  const [interviewStartTime, setInterviewStartTime] = useState<string>("");
+
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [showSessionProfileDialog, setShowSessionProfileDialog] = useState(false);
@@ -130,10 +130,7 @@ export default function InterviewPage() {
 
   const handleStartInterview = async () => {
     try {
-      // 记录面试开始时间
-      const now = new Date();
-      const timeString = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-      setInterviewStartTime(timeString);
+
 
       await startInterview();
     } catch (error) {
@@ -204,7 +201,7 @@ export default function InterviewPage() {
   const handleNewSession = () => {
     createNewSession();
     setStoreShowAbilityProfile(false);
-    setInterviewStartTime("");
+
   };
 
   const scrollToBottom = () => {
@@ -436,12 +433,7 @@ export default function InterviewPage() {
                         问题 {Math.min(interviewProgress.current + 1, interviewProgress.total)} / {interviewProgress.total}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1.5 text-gray-500">
-                        <Timer className="w-4 h-4" />
-                        <span>{interviewStartTime || '--:--'}</span>
-                      </div>
-                    </div>
+
                   </div>
                   {/* 进度条 */}
                   <div className="mt-3 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
@@ -457,7 +449,7 @@ export default function InterviewPage() {
             {/* 聊天区域 */}
             <div className="flex-1 overflow-hidden relative flex flex-col">
               <ScrollArea className="flex-1 px-4 overflow-hidden" viewportRef={scrollViewportRef} onScroll={handleScroll}>
-                <div className="max-w-3xl mx-auto py-6 space-y-6">
+                <div className="max-w-3xl mx-auto pt-6 pb-2 space-y-6">
                   {/* 初始加载状态：当正在加载或流式传输且没有消息时显示 */}
                   {(isLoading || isStreaming) && messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 space-y-4 animate-in fade-in duration-500">
@@ -496,15 +488,29 @@ export default function InterviewPage() {
                       <span>面试官正在思考...</span>
                     </div>
                   )}
-                  {/* 底部留白 */}
-                  <div className="h-4" />
                   <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
 
+
+
               {/* 输入区域 */}
               <div className="relative w-full bg-white border-t border-gray-100 px-6 py-4 z-20">
                 <div className="max-w-3xl mx-auto relative">
+                  {/* 滚动到底部按钮 - 移动到输入框上方，确保不被遮挡 */}
+                  {showScrollButton && (
+                    <div className="absolute -top-12 left-0 right-0 flex justify-center z-20 pointer-events-none">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="rounded-full shadow-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 gap-2 pointer-events-auto animate-in fade-in zoom-in duration-300"
+                        onClick={scrollToBottom}
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                        <span>回到底部</span>
+                      </Button>
+                    </div>
+                  )}
                   {/* 开启下一轮面试按钮 - 仅在面试完成时显示 */}
                   {interviewProgress &&
                     interviewProgress.current >= interviewProgress.total &&
@@ -670,42 +676,60 @@ export default function InterviewPage() {
                       </div>
                     )}
 
-                  <div className="flex gap-2">
-                    <div className="flex-1 relative flex items-center">
-                      {/* 输入框 Textarea */}
-                      <textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="输入您的回答..."
-                        className="w-full resize-none rounded-2xl border border-gray-200 py-3 pl-4 pr-12 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-50 min-h-[52px] max-h-[200px]"
-                        rows={1}
-                      />
-                      {/* 语音按钮 */}
-                      <button
-                        onClick={toggleListening}
-                        className={cn(
-                          "absolute right-3 p-2 rounded-full transition-colors",
-                          isListening ? "bg-red-100 text-red-500 animate-pulse" : "hover:bg-gray-100 text-gray-400"
-                        )}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></svg>
-                      </button>
-                    </div>
+                  {/* 判断面试是否已完成 */}
+                  {(() => {
+                    const isInterviewCompleted = !!(interviewProgress && interviewProgress.current >= interviewProgress.total);
+                    return (
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1 relative flex">
+                          {/* 输入框 Textarea */}
+                          <textarea
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder={isInterviewCompleted ? "本轮面试已结束" : "输入您的回答..."}
+                            disabled={isStreaming || isInterviewCompleted}
+                            className={cn(
+                              "w-full resize-none rounded-2xl border border-gray-200 py-3 pl-4 pr-12 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-50 min-h-[120px] max-h-[200px]",
+                              isInterviewCompleted && "bg-gray-50 cursor-not-allowed opacity-60"
+                            )}
+                            rows={4}
+                          />
+                          {/* 语音按钮 */}
+                          <button
+                            onClick={toggleListening}
+                            disabled={isInterviewCompleted}
+                            className={cn(
+                              "absolute right-3 bottom-3 p-2 rounded-full transition-colors",
+                              isListening ? "bg-red-100 text-red-500 animate-pulse" : "hover:bg-gray-100 text-gray-400",
+                              isInterviewCompleted && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></svg>
+                          </button>
+                        </div>
 
-                    <Button
-                      onClick={handleSend}
-                      disabled={!input.trim() || isStreaming}
-                      className={cn(
-                        "h-[52px] w-[52px] rounded-2xl transition-all",
-                        input.trim() && !isStreaming
-                          ? "bg-teal-600 hover:bg-teal-700 shadow-lg shadow-teal-200"
-                          : "bg-gray-100 text-gray-400"
-                      )}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
-                    </Button>
-                  </div>
+                        <Button
+                          onClick={isStreaming ? stopStreaming : handleSend}
+                          disabled={!isStreaming && (!input.trim() || isInterviewCompleted)}
+                          className={cn(
+                            "h-[52px] w-[52px] rounded-2xl transition-all",
+                            isStreaming
+                              ? "bg-red-500 hover:bg-red-600 shadow-lg shadow-red-200"
+                              : input.trim() && !isInterviewCompleted
+                                ? "bg-teal-600 hover:bg-teal-700 shadow-lg shadow-teal-200"
+                                : "bg-gray-100 text-gray-400"
+                          )}
+                        >
+                          {isStreaming ? (
+                            <Square className="w-5 h-5" fill="currentColor" />
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+                          )}
+                        </Button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PanelLeftClose, Plus, Settings, User, Bot, FileText, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -131,8 +132,8 @@ export function SessionSidebar({
                         <div className="flex flex-col">
                             {/* 1. 顶部图标和关闭按钮 */}
                             <div className="px-4 pt-6 pb-2 flex items-center justify-between">
-                                <div className="w-10 h-10 bg-teal-600 rounded-xl flex items-center justify-center">
-                                    <Bot className="w-6 h-6 text-white" />
+                                <div className="w-10 h-10 relative flex items-center justify-center rounded-xl overflow-hidden">
+                                    <Image src="/logo.png" alt="Logo" width={40} height={40} className="object-cover" />
                                 </div>
                                 <Button
                                     variant="ghost"

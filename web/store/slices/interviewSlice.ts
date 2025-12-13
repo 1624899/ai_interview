@@ -293,7 +293,8 @@ export const createInterviewSlice = (set: SetState, get: GetState): InterviewFlo
             }
 
             // 刷新会话列表
-            await get().fetchSessions('active', 'mock');
+            // 刷新会话列表，保持与页面初始化一致的过滤条件（获取所有状态的 mock 会话）
+            await get().fetchSessions(undefined, 'mock');
 
         } catch (error) {
             if ((error as Error).name !== 'AbortError') {

@@ -11,6 +11,13 @@ export function useSpeechToText({ onTranscript, lang = 'zh-CN' }: UseSpeechToTex
     const recognitionRef = useRef<any>(null);
     const isListeningRef = useRef(false);
 
+    const onTranscriptRef = useRef(onTranscript);
+
+    // 更新 ref，确保回调总是最新的
+    useEffect(() => {
+        onTranscriptRef.current = onTranscript;
+    }, [onTranscript]);
+
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -67,14 +74,21 @@ export function useSpeechToText({ onTranscript, lang = 'zh-CN' }: UseSpeechToTex
                         }
                     }
                     if (finalTranscript) {
-                        onTranscript(finalTranscript);
+                        onTranscriptRef.current(finalTranscript);
                     }
                 };
             } else {
                 setError('Browser does not support speech recognition.');
             }
         }
-    }, [lang, onTranscript]);
+
+        return () => {
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+                isListeningRef.current = false;
+            }
+        };
+    }, [lang]);
 
     const startListening = useCallback(() => {
         if (recognitionRef.current && !isListening) {

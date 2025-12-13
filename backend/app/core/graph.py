@@ -203,14 +203,47 @@ async def node_planner(state: InterviewState):
     }}
     """
     
-    # 禁用流式输出以避免 OpenAI structured output 的 bug
-    # 使用用户配置的 LLM 或默认 LLM
+    # 使用用户配置的 LLM
     api_config = state.get("api_config")
     current_llm = llms.get_llm_for_request(api_config, channel="smart")
-    structured_llm = current_llm.with_structured_output(PlanOutput).with_config({"run_name": "planner"})
-    plan = await structured_llm.ainvoke(prompt, config={"callbacks": []})
     
-    interview_plan = [q.model_dump() for q in plan.questions]
+    # 直接调用 LLM，手动解析 JSON
+    response = await current_llm.ainvoke(prompt)
+    response_text = response.content if hasattr(response, 'content') else str(response)
+    
+    # 解析 JSON
+    try:
+        # 尝试清理可能的 markdown 格式
+        cleaned_text = response_text.strip()
+        if cleaned_text.startswith("```json"):
+            cleaned_text = cleaned_text[7:]
+        if cleaned_text.startswith("```"):
+            cleaned_text = cleaned_text[3:]
+        if cleaned_text.endswith("```"):
+            cleaned_text = cleaned_text[:-3]
+        cleaned_text = cleaned_text.strip()
+        
+        plan_data = json.loads(cleaned_text)
+        interview_plan = plan_data.get("questions", [])
+        
+        # 验证数据结构
+        for i, q in enumerate(interview_plan):
+            if "id" not in q:
+                q["id"] = i + 1
+            if "topic" not in q:
+                q["topic"] = "未知主题"
+            if "content" not in q:
+                q["content"] = q.get("question", "请描述一下相关经验")
+            if "type" not in q:
+                q["type"] = "tech"
+                
+    except json.JSONDecodeError as e:
+        logger.error(f"解析面试计划 JSON 失败: {e}")
+        logger.error(f"原始响应: {response_text[:500]}")
+        # 使用默认问题
+        interview_plan = [
+            {"id": 1, "topic": "自我介绍", "content": "请先做一个简短的自我介绍", "type": "intro"}
+        ]
     
     # 保存 interview_plan 到数据库
     if session_id:

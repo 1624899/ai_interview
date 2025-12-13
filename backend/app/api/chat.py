@@ -39,17 +39,6 @@ async def start_interview(
     Returns:
         dict: 会话开始结果
     """
-    print("=" * 80)
-    print("📥 收到 start_interview 请求")
-    print(f"thread_id: {request.thread_id}")
-    print(f"mode: {request.mode}")
-    print(f"max_questions: {request.max_questions}")
-    print(f"resume_filename: {request.resume_filename}")
-    jd = request.job_description or ""
-    print(f"job_description: {jd[:100]}..." if len(jd) > 100 else f"job_description: {jd}")
-    print(f"company_info: {request.company_info}")
-    print(f"api_config: {request.api_config}")
-    print("=" * 80)
     
     session_created = False  # 标记是否新创建了会话（用于异常时清理）
     

@@ -471,6 +471,7 @@ export async function getGeneratedResume(resumeId: number): Promise<GeneratedRes
     }
 }
 
+
 /**
  * 删除已生成的简历
  */
@@ -485,3 +486,20 @@ export async function deleteGeneratedResume(resumeId: number): Promise<boolean> 
         return false;
     }
 }
+
+/**
+ * 更新已生成的简历内容
+ */
+export async function updateGeneratedResume(resumeId: number, content: string, title?: string): Promise<boolean> {
+    try {
+        const response = await apiRequest<{ success: boolean }>(`/api/resume/generated/${resumeId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ content, title }),
+        });
+        return response.success;
+    } catch (error) {
+        console.error('更新简历失败:', error);
+        return false;
+    }
+}
+

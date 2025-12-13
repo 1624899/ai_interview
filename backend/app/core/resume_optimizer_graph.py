@@ -112,7 +112,7 @@ async def node_match_analyst(state: ResumeOptimizerState) -> dict:
 4. 找出简历中缺失的关键词
 5. 找出简历中的加分项（JD 未要求但有价值的内容）
 
-请输出 JSON 格式（不要使用 markdown 代码块）：
+请输出 JSON 格式（不要使用 markdown 代码块，注意 JSON 结构涉及的标点必须是英文）：
 {{
     "jd_keywords": ["关键词1", "关键词2", ...],
     "matched_keywords": ["匹配的关键词1", ...],
@@ -168,7 +168,7 @@ async def node_content_writer(state: ResumeOptimizerState) -> dict:
 3. 突出与 JD 匹配的亮点
 4. {"结合面试中展现的能力，补充简历未体现的内容" if interview_conversations else ""}
 
-请输出 JSON 格式（不要使用 markdown 代码块）：
+请输出 JSON 格式（不要使用 markdown 代码块，注意 JSON 结构涉及的标点必须是英文）：
 {{
     "sections": [
         {{
@@ -235,7 +235,7 @@ async def node_hr_reviewer(state: ResumeOptimizerState) -> dict:
    - 废话套话过多（空洞的自我评价）
    - 信息堆砌、缺乏重点
 
-请输出 JSON 格式（不要使用 markdown 代码块）：
+请输出 JSON 格式（不要使用 markdown 代码块，注意 JSON 结构涉及的标点必须是英文）：
 {{
     "first_impression": {{
         "score": 7,
@@ -303,7 +303,7 @@ async def node_moderator(state: ResumeOptimizerState) -> dict:
 2. 解决专家意见中的冲突（如有）
 3. 生成最终的优化方案
 
-请输出 JSON 格式（不要使用 markdown 代码块）：
+请输出 JSON 格式（不要使用 markdown 代码块，注意 JSON 结构涉及的标点必须是英文）：
 {{
     "match_score": 75,
     "hr_pass_rate": 70,
@@ -372,7 +372,7 @@ async def node_reflect(state: ResumeOptimizerState) -> dict:
 3. 有没有过度美化或不真实的风险？
 4. 面试中展现的能力是否都已考虑？
 
-请输出 JSON 格式（不要使用 markdown 代码块）：
+请输出 JSON 格式（不要使用 markdown 代码块，注意 JSON 结构涉及的标点必须是英文）：
 {{
     "issues_found": ["发现的问题1", ...],
     "additional_suggestions": ["额外建议1", ...],
@@ -438,7 +438,7 @@ async def node_refine(state: ResumeOptimizerState) -> dict:
 3. 调整可能存在风险的内容
 4. 确保建议更加具体和可操作
 
-请输出 JSON 格式（不要使用 markdown 代码块），保持与原方案相同的结构，但内容已经过改进：
+请输出 JSON 格式（不要使用 markdown 代码块，注意 JSON 结构涉及的标点必须是英文）：
 {{
     "match_score": 75,
     "hr_pass_rate": 70,

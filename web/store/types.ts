@@ -109,6 +109,7 @@ export const API_PROVIDERS = [
     { id: 'siliconflow', name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', apiKeyUrl: 'https://cloud.siliconflow.cn/account/ak', models: ['deepseek-ai/DeepSeek-V3.2', 'deepseek-ai/DeepSeek-R1', 'Qwen/Qwen3-235B', 'THUDM/glm-4.5', 'moonshot-ai/Kimi-K2'] },
     { id: 'iflow', name: '心流开放平台（免费）', baseUrl: 'https://apis.iflow.cn/v1', apiKeyUrl: 'https://platform.iflow.cn/profile?tab=apiKey', models: ['qwen3-max', 'qwen3-coder-plus', 'glm-4.6', 'kimi-k2', 'qwen3-235b-a22b-instruct', 'deepseek-v3.2'] },
     { id: 'modelscope', name: 'ModelScope（免费）', baseUrl: 'https://api-inference.modelscope.cn/v1', apiKeyUrl: 'https://www.modelscope.cn/my/myaccesstoken', models: ['deepseek-ai/DeepSeek-V3.2', 'Qwen/Qwen3-Coder-480B-A35B-Instruct', 'Qwen/Qwen3-235B-A22B-Instruct-2507'] },
+    { id: 'minimax', name: 'Minimax', baseUrl: 'https://api.minimaxi.com/v1', apiKeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key', models: ['MiniMax-M2'] },
     { id: 'custom', name: '自定义', baseUrl: '', apiKeyUrl: '', models: [] },
 ];
 

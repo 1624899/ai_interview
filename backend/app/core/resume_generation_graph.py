@@ -76,7 +76,7 @@ async def node_analyze_needs(state: ResumeGenerationState) -> dict:
 3. 项目中的个人贡献和角色 - 仅在描述模糊时询问
 4. 与目标岗位高度相关的项目经历 - 仅在项目经历描述模糊时询问
 
-请输出 JSON 格式（不要使用 markdown 代码块）：
+请输出 JSON 格式（不要使用 markdown 代码块，注意 JSON 结构涉及的标点必须是英文）：
 {{
     "has_gaps": true/false,
     "questions": [
@@ -151,7 +151,16 @@ async def node_generate_draft(state: ResumeGenerationState) -> dict:
     review_guidance = ""
     if review_result and not review_result.get("passed", True):
         issues = review_result.get("issues", [])
-        factual_notes = [i['detail'] for i in issues if i.get('type') == 'excessive_fabrication']
+        factual_notes = []
+        for i in issues:
+            if i.get('type') == 'excessive_fabrication':
+                # 适配新的结构化字段
+                loc = i.get('location', '未知位置')
+                fab = i.get('fabricated', '未知内容')
+                reason = i.get('reason', '')
+                note = f"- 【{loc}】检测到造假：{fab}（原因：{reason}）"
+                factual_notes.append(note)
+                
         if factual_notes:
             review_guidance = f"\n\n【重要修正要求】上次生成存在过度包装或逻辑漏洞，请修正：\n" + "\n".join(factual_notes)
     
@@ -217,7 +226,7 @@ async def node_generate_draft(state: ResumeGenerationState) -> dict:
 ## 输出结构（请严格按照以下格式，内容要丰富）：
 
 # [姓名]
-> [联系方式]
+> [性别] | [年龄] | [联系方式]
 [求职意向] | [期望薪资] | [期望城市]
 
 ## 个人简介
@@ -337,6 +346,7 @@ async def node_optimize_draft(state: ResumeGenerationState) -> dict:
 - 是否有项目经历被遗漏？→ 必须补充
 - 技能清单是否完整？→ 必须展开详细描述
 - 教育背景是否完整？→ 必须保留
+- 项目日期是否准确？→ 必须一致
 
 ### 2. 内容丰富度检查（重点！）
 **简历不能太简洁！** 每个模块都要有足够的内容：
@@ -367,7 +377,7 @@ async def node_optimize_draft(state: ResumeGenerationState) -> dict:
 
 ## 输出要求
 
-请输出 JSON 格式（不要使用 markdown 代码块，所有字符串使用英文双引号）：
+请输出 JSON 格式（不要使用 markdown 代码块，注意 JSON 结构涉及的标点必须是英文）：
 {{
     "optimized_content": "优化后的完整 Markdown 简历（内容要丰富饱满）...",
     "optimization_summary": {{
@@ -458,13 +468,16 @@ async def node_fact_check(state: ResumeGenerationState) -> dict:
 
 **只有在确实出现"无中生有"的核心硬技能或经历时，才标记为过度造假。**
 
-请输出 JSON 格式（不要使用 markdown 代码块、emoji表情）：
+请输出 JSON 格式（不要使用 markdown 代码块、注意 JSON 结构涉及的标点必须是英文）：
 {{
     "is_excessive": true/false,  // 是否过度造假
     "risk_details": [
         {{
             "type": "excessive_fabrication",
-            "description": "检测到严重造假：生成简历中..."
+            "location": "具体位置（如：工作经历-XX公司、项目经历-XX项目、专业技能等）",
+            "original": "原始简历中的相关内容（如无则填'无相关描述'）",
+            "fabricated": "生成简历中被造假/过度夸大的具体内容",
+            "reason": "判定为造假的理由（如：原简历无此技能、数据违反常理等）"
         }}
     ]
 }}
@@ -502,12 +515,30 @@ async def node_finalize_and_review(state: ResumeGenerationState) -> dict:
     warning = ""
     if fact_check_result.get("is_excessive"):
         details = fact_check_result.get("risk_details", [])
+        # 构建更清晰的修正指导
+        fix_instructions = []
+        for i, detail in enumerate(details, 1):
+            location = detail.get("location", "未知位置")
+            original = detail.get("original", "无相关描述")
+            fabricated = detail.get("fabricated", "未知内容")
+            reason = detail.get("reason", "未说明")
+            fix_instructions.append(
+                f"  {i}. 【{location}】\n"
+                f"     - 原始内容：{original}\n"
+                f"     - 造假内容：{fabricated}\n"
+                f"     - 造假原因：{reason}"
+            )
+        
         warning = f"""
-**风控警告：检测到过度造假，必须修正**：
-{json.dumps(details, ensure_ascii=False, indent=2)}
+**风控警告：检测到过度造假，必须修正以下内容**：
 
-请对相关内容进行**修正或弱化表述**，使其符合客观事实，**但不要删除整段经历，也不要大幅缩减简历篇幅**。
-修正原则：将"过于夸张的数据"修改为"合理估算的数据"，将"无中生有"的技能修改为"了解/熟悉"或删除该具体技能点（保留其他真实技能）。
+{chr(10).join(fix_instructions)}
+
+**修正原则**：
+- 对于【造假内容】部分，请根据【原始内容】进行修正或弱化表述
+- 将"过于夸张的数据"修改为"合理估算的数据"
+- 将"无中生有"的技能修改为"了解/熟悉"或删除该具体技能点（保留其他真实技能）
+- **不要删除整段经历，也不要大幅缩减简历篇幅**
 """
 
     prompt = f"""你是一位「简历终审专家」。请对以下简历进行最终润色。
@@ -527,7 +558,7 @@ async def node_finalize_and_review(state: ResumeGenerationState) -> dict:
 4. **长度保持**：**严禁大幅删减内容！** 修正后的简历长度应与草稿基本保持一致（允许+/- 10%波动）。如果不涉及造假的部分，请原样保留或仅做润色。
 5. **最终打磨**：确保简历读起来流畅、专业。
 
-请输出 JSON 格式：
+请输出 JSON 格式（不要使用 markdown 代码块，注意 JSON 结构涉及的标点必须是英文）：
 {{
     "final_content": "最终修订后的完整 Markdown 简历...",
     "review_passed": true/false,
@@ -539,6 +570,7 @@ async def node_finalize_and_review(state: ResumeGenerationState) -> dict:
 - 内容要丰富，不要写得太简洁！每个模块都要有实质内容
 - 专业技能要详细，体现深度和与岗位的匹配
 - 禁止使用emoji表情
+- 禁止修改项目日期
 """
     
     llm = llms.get_llm_for_request(api_config, channel="hr_reviewer")

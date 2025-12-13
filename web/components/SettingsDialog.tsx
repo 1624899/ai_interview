@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Plus, Eye, EyeOff, Check, Loader2, AlertCircle, Brain, Zap, ChevronLeft, ChevronDown, FileText, Users, PenTool, UserCheck, CheckCircle } from 'lucide-react';
+import { Settings, Plus, Eye, EyeOff, Check, Loader2, AlertCircle, Brain, Zap, ChevronLeft, ChevronDown, FileText, Users, PenTool, UserCheck, CheckCircle, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -31,9 +31,10 @@ interface ModelFormDialogProps {
     onClose: () => void;
     onSave: (model: Omit<ModelConfig, 'id' | 'createdAt'>) => void;
     editingModel?: ModelConfig;
+    initialValues?: Partial<ModelConfig>;
 }
 
-function ModelFormDialog({ open, onClose, onSave, editingModel }: ModelFormDialogProps) {
+function ModelFormDialog({ open, onClose, onSave, editingModel, initialValues }: ModelFormDialogProps) {
     const [provider, setProvider] = useState(editingModel?.provider || '');
     const [apiKey, setApiKey] = useState(editingModel?.apiKey || '');
     const [baseUrl, setBaseUrl] = useState(editingModel?.baseUrl || '');
@@ -52,6 +53,12 @@ function ModelFormDialog({ open, onClose, onSave, editingModel }: ModelFormDialo
                 setBaseUrl(editingModel.baseUrl);
                 setModel(editingModel.model);
                 setName(editingModel.name);
+            } else if (initialValues) {
+                setProvider(initialValues.provider || '');
+                setApiKey(initialValues.apiKey || '');
+                setBaseUrl(initialValues.baseUrl || '');
+                setModel(initialValues.model || '');
+                setName(''); // 复制时不复制名称，当作新配置
             } else {
                 setProvider('');
                 setApiKey('');
@@ -62,7 +69,7 @@ function ModelFormDialog({ open, onClose, onSave, editingModel }: ModelFormDialo
             setShowApiKey(false);
             setTestResult(null);
         }
-    }, [open, editingModel]);
+    }, [open, editingModel, initialValues]);
 
     // 选择提供商
     const handleProviderChange = (providerId: string) => {
@@ -292,11 +299,20 @@ function ModelFormDialog({ open, onClose, onSave, editingModel }: ModelFormDialo
                 </div>
 
                 <DialogFooter className="flex-col sm:flex-row gap-2">
+                    {!testResult && (
+                        <div className="flex items-center gap-2 px-1 pb-2">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                            </span>
+                            <p className="text-xs text-orange-600 font-medium">请先测试连接，确保配置可用</p>
+                        </div>
+                    )}
                     <Button
                         variant="outline"
                         onClick={handleTestConnection}
                         disabled={isTesting || !canSave}
-                        className="flex-1 sm:flex-none"
+                        className="flex-1 sm:flex-none border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 hover:text-orange-800 hover:border-orange-300 transition-colors"
                     >
                         {isTesting ? (
                             <>
@@ -346,9 +362,19 @@ export function SettingsDialog({
     } = useInterviewStore();
     const [showModelForm, setShowModelForm] = useState(false);
     const [editingModel, setEditingModel] = useState<ModelConfig | undefined>();
+    const [sourceModel, setSourceModel] = useState<ModelConfig | undefined>();
 
     // 打开添加模型弹窗
     const handleAddModel = () => {
+        setEditingModel(undefined);
+        setSourceModel(undefined);
+        setShowModelForm(true);
+    };
+
+    // 复制模型配置
+    const handleDuplicateModel = (model: ModelConfig, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSourceModel(model);
         setEditingModel(undefined);
         setShowModelForm(true);
     };
@@ -412,13 +438,22 @@ export function SettingsDialog({
                                             <div className="text-xs text-gray-400 truncate">
                                                 {model.model}
                                             </div>
-                                            {/* 删除按钮 */}
-                                            <button
-                                                onClick={(e) => handleDeleteModel(model.id, e)}
-                                                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs"
-                                            >
-                                                ×
-                                            </button>
+                                            <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={(e) => handleDuplicateModel(model, e)}
+                                                    className="w-5 h-5 rounded-full bg-teal-500 text-white flex items-center justify-center hover:bg-teal-600 shadow-sm"
+                                                    title="复制配置"
+                                                >
+                                                    <Copy className="w-3 h-3" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleDeleteModel(model.id, e)}
+                                                    className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 shadow-sm"
+                                                    title="删除配置"
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -444,7 +479,7 @@ export function SettingsDialog({
                                         <label className="flex items-center gap-2 text-sm text-gray-600">
                                             <Brain className="w-4 h-4 text-purple-500" />
                                             Smart
-                                            <span className="text-xs text-gray-400">（复杂任务：规划、总结）</span>
+                                            <span className="text-xs text-gray-400">（复杂任务：规划、总结，推荐qwen3max）</span>
                                         </label>
                                         <div className="relative">
                                             <select
@@ -468,7 +503,7 @@ export function SettingsDialog({
                                         <label className="flex items-center gap-2 text-sm text-gray-600">
                                             <Zap className="w-4 h-4 text-amber-500" />
                                             Fast
-                                            <span className="text-xs text-gray-400">（快速响应：问答、点评）</span>
+                                            <span className="text-xs text-gray-400">（快速响应：问答、点评，任意都可）</span>
                                         </label>
                                         <div className="relative">
                                             <select
@@ -495,12 +530,17 @@ export function SettingsDialog({
                                         简历工具模型配置
                                     </label>
 
+                                    <div className="flex items-start gap-2 p-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                        <p>注意：由于免费模型存在并发限制，匹配分析师、内容优化师、HR审核官只允许一个配置免费模型。deepseekv3与deepseekchat是同一模型</p>
+                                    </div>
+
                                     {/* 通用任务（简历分析 + 主持人） */}
                                     <div className="space-y-2">
                                         <label className="flex items-center gap-2 text-sm text-gray-600">
                                             <Brain className="w-4 h-4 text-indigo-500" />
                                             通用任务
-                                            <span className="text-xs text-gray-400">（简历分析、主持人）</span>
+                                            <span className="text-xs text-gray-400">（简历分析、主持人，推荐qwen3max）</span>
                                         </label>
                                         <div className="relative">
                                             <select
@@ -524,7 +564,7 @@ export function SettingsDialog({
                                         <label className="flex items-center gap-2 text-sm text-gray-600">
                                             <Users className="w-4 h-4 text-blue-500" />
                                             匹配分析师
-                                            <span className="text-xs text-gray-400">（JD关键词匹配）</span>
+                                            <span className="text-xs text-gray-400">（JD关键词匹配，推荐deepseekv3）</span>
                                         </label>
                                         <div className="relative">
                                             <select
@@ -548,7 +588,7 @@ export function SettingsDialog({
                                         <label className="flex items-center gap-2 text-sm text-gray-600">
                                             <PenTool className="w-4 h-4 text-green-500" />
                                             内容优化师
-                                            <span className="text-xs text-gray-400">（内容重写建议）</span>
+                                            <span className="text-xs text-gray-400">（内容重写建议，推荐deepseekv3/kimi-k2）</span>
                                         </label>
                                         <div className="relative">
                                             <select
@@ -572,7 +612,7 @@ export function SettingsDialog({
                                         <label className="flex items-center gap-2 text-sm text-gray-600">
                                             <UserCheck className="w-4 h-4 text-orange-500" />
                                             HR审核官
-                                            <span className="text-xs text-gray-400">（模拟HR筛选）</span>
+                                            <span className="text-xs text-gray-400">（模拟HR筛选，推荐deepseekv3/minimax）</span>
                                         </label>
                                         <div className="relative">
                                             <select
@@ -596,7 +636,7 @@ export function SettingsDialog({
                                         <label className="flex items-center gap-2 text-sm text-gray-600">
                                             <CheckCircle className="w-4 h-4 text-purple-500" />
                                             质量审核
-                                            <span className="text-xs text-gray-400">（最终检查）</span>
+                                            <span className="text-xs text-gray-400">（最终检查，推荐qwen3max）</span>
                                         </label>
                                         <div className="relative">
                                             <select
@@ -640,9 +680,11 @@ export function SettingsDialog({
                 onClose={() => {
                     setShowModelForm(false);
                     setEditingModel(undefined);
+                    setSourceModel(undefined);
                 }}
                 onSave={handleSaveModel}
                 editingModel={editingModel}
+                initialValues={sourceModel}
             />
         </>
     );

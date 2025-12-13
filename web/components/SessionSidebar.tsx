@@ -10,6 +10,7 @@ import { ResumePreviewDialog } from './ResumePreviewDialog';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useInterviewStore } from '@/store/useInterviewStore';
+import { updateGeneratedResume } from '@/lib/api/resume';
 
 interface SessionSidebarProps {
     isOpen: boolean;
@@ -288,11 +289,18 @@ export function SessionSidebar({
                 )}
             </AnimatePresence>
 
+
             <ResumePreviewDialog
                 isOpen={showPreview}
                 onClose={() => setShowPreview(false)}
                 title={currentGeneratedResume?.title || '简历预览'}
                 content={currentGeneratedResume?.content || ''}
+                onContentChange={async (newContent) => {
+                    if (currentGeneratedResume?.id) {
+                        await updateGeneratedResume(currentGeneratedResume.id, newContent);
+                        fetchGeneratedResumes();
+                    }
+                }}
             />
         </>
     );

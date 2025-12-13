@@ -23,6 +23,7 @@ import {
     ResumeOptimizeResult,
     ApiConfig,
     OptimizeProgressEvent,
+    updateGeneratedResume,
 } from "@/lib/api/resume";
 import { API_BASE_URL, getUserId } from "@/lib/api/config";
 
@@ -54,6 +55,7 @@ export function ResumeTools({ apiConfig, resumeContent, onResumeChange }: Resume
     const [showGenerationDialog, setShowGenerationDialog] = useState(false);
     const [showPreviewDialog, setShowPreviewDialog] = useState(false);
     const [previewContent, setPreviewContent] = useState({ title: "", content: "" });
+    const [previewResumeId, setPreviewResumeId] = useState<number | null>(null);
 
     // UI 状态
     const [activeTab, setActiveTab] = useState("analyze");
@@ -844,6 +846,7 @@ export function ResumeTools({ apiConfig, resumeContent, onResumeChange }: Resume
                     apiConfig={apiConfig}
                     onSuccess={(id, title, content) => {
                         setPreviewContent({ title, content });
+                        setPreviewResumeId(id);
                         setShowPreviewDialog(true);
                         // 刷新已生成列表
                         useInterviewStore.getState().fetchGeneratedResumes?.();
@@ -856,6 +859,13 @@ export function ResumeTools({ apiConfig, resumeContent, onResumeChange }: Resume
                 onClose={() => setShowPreviewDialog(false)}
                 title={previewContent.title}
                 content={previewContent.content}
+                onContentChange={async (newContent) => {
+                    setPreviewContent(prev => ({ ...prev, content: newContent }));
+                    if (previewResumeId) {
+                        await updateGeneratedResume(previewResumeId, newContent);
+                        useInterviewStore.getState().fetchGeneratedResumes?.();
+                    }
+                }}
             />
         </div>
     );

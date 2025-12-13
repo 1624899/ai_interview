@@ -197,6 +197,55 @@ class ResumeGenerationService:
                 logger.error(f"删除生成的简历失败: {e}")
                 return False
     
+    async def update_generated_resume(
+        self,
+        resume_id: int,
+        user_id: str,
+        content: Optional[str] = None,
+        title: Optional[str] = None
+    ) -> bool:
+        """更新生成的简历"""
+        if not content and not title:
+            return False
+            
+        async with db_manager.get_connection() as conn:
+            try:
+                # 构建 SQL
+                updates = []
+                values = []
+                idx = 1
+                
+                if content is not None:
+                    updates.append(f"content = ${idx}")
+                    values.append(content)
+                    idx += 1
+                    
+                if title is not None:
+                    updates.append(f"title = ${idx}")
+                    values.append(title)
+                    idx += 1
+                
+                # 添加 ID 和 用户ID 作为条件
+                values.append(resume_id)
+                values.append(user_id)
+                
+                sql = f'''
+                    UPDATE generated_resumes
+                    SET {", ".join(updates)}
+                    WHERE id = ${idx} AND user_id = ${idx+1}
+                '''
+                
+                result = await conn.execute(sql, *values)
+                
+                updated = result.split()[-1] != '0'
+                if updated:
+                    logger.info(f"更新生成的简历: ID={resume_id}")
+                return updated
+                
+            except Exception as e:
+                logger.error(f"更新生成的简历失败: {e}")
+                return False
+
     def _row_to_dict(self, row) -> Dict[str, Any]:
         """将数据库行转换为字典"""
         created_at = row['created_at']

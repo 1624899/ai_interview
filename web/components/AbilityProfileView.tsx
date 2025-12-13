@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, RefreshCw, Sparkles, AlertCircle } from 'lucide-react';
+import { Loader2, RefreshCw, AlertCircle, CheckCircle2, Check, Brain, Wand2, Lightbulb } from 'lucide-react';
 import { getOverallProfile, generateProfile, type AbilityProfile } from '@/lib/api/profile';
 import { AbilityRadarChart } from './RadarChart';
 import { SkillTags } from './SkillTags';
@@ -73,7 +73,7 @@ export function AbilityProfileView() {
         return (
             <div className="flex flex-col items-center justify-center h-full py-20 px-6">
                 <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mb-4">
-                    <Sparkles className="w-8 h-8 text-teal-600" />
+                    <Brain className="w-8 h-8 text-teal-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">尚未生成能力画像</h3>
                 <p className="text-sm text-gray-500 text-center mb-6 max-w-sm">
@@ -91,7 +91,7 @@ export function AbilityProfileView() {
                         </>
                     ) : (
                         <>
-                            <Sparkles className="w-4 h-4" />
+                            <Wand2 className="w-4 h-4" />
                             生成能力画像
                         </>
                     )}
@@ -108,8 +108,8 @@ export function AbilityProfileView() {
 
     // 有数据 - 显示画像
     return (
-        <div className="overflow-y-auto h-full p-6">
-            <div className="max-w-4xl mx-auto space-y-6">
+        <div className="overflow-y-auto h-full p-6 bg-slate-50/50">
+            <div className="max-w-4xl mx-auto space-y-6 pb-12">
                 {/* 标题和操作栏 */}
                 <div className="flex items-center justify-between">
                     <div>
@@ -148,24 +148,68 @@ export function AbilityProfileView() {
                     </div>
                 )}
 
-                {/* 雷达图 */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                    <h3 className="text-base font-semibold text-gray-900 mb-4">能力雷达图</h3>
-                    <AbilityRadarChart data={profile} />
-                </div>
-
-                {/* 技能标签 */}
-                {profile.skill_tags && profile.skill_tags.length > 0 && (
-                    <div className="bg-white rounded-xl border border-gray-200 p-6">
-                        <SkillTags tags={profile.skill_tags} />
+                {/* 深色仪表盘区域 */}
+                <div className="bg-[#0F172A] rounded-2xl border border-gray-800 p-8 relative overflow-hidden shadow-xl">
+                    {/* 背景装饰 - 网格 */}
+                    <div className="absolute inset-0 bg-white/5 opacity-20"></div>
+                    <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[80px]"></div>
+                        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-teal-500/10 rounded-full blur-[80px]"></div>
                     </div>
-                )}
+
+                    {/* 背景装饰 - 中间发光 */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
+                        {/* 左侧：雷达图 */}
+                        <div className="flex-1 w-full max-w-md">
+                            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                                <span className="w-1 h-6 bg-teal-400 rounded-full inline-block"></span>
+                                能力雷达图
+                            </h3>
+                            <div className="bg-white/5 rounded-2xl border border-white/5 p-4 backdrop-blur-sm">
+                                <AbilityRadarChart data={profile} />
+                            </div>
+                        </div>
+
+                        {/* 右侧：技能标签与摘要 */}
+                        <div className="flex-1 w-full flex flex-col justify-center">
+                            {profile.skill_tags && profile.skill_tags.length > 0 && (
+                                <div className="mb-8">
+                                    <h4 className="text-sm font-medium text-gray-400 mb-3 uppercase tracking-wider">识别到的技能栈</h4>
+                                    <div className="flex flex-wrap gap-2.5">
+                                        {profile.skill_tags.map((tag, index) => (
+                                            <span
+                                                key={index}
+                                                className="px-3 py-1.5 bg-white/10 text-teal-50 border border-white/10 rounded-lg text-sm font-medium hover:bg-white/20 hover:border-teal-500/30 transition-all cursor-default"
+                                            >
+                                                {tag}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 简短的引导文案 */}
+                            <div className="bg-gradient-to-br from-teal-500/20 to-blue-600/20 rounded-xl p-5 border border-white/10">
+                                <div className="flex items-start gap-3">
+                                    <Lightbulb className="w-5 h-5 text-teal-400 mt-1 flex-shrink-0" />
+                                    <p className="text-sm text-gray-300 leading-relaxed">
+                                        基于面试表现，虽然您的经验年限较短，但在<strong className="text-teal-300">{profile.key_strengths?.[0] || '某些领域'}</strong>展现出了不错的潜力。建议重点加强<strong className="text-teal-300">{profile.key_weaknesses?.[0] || '薄弱项'}</strong>的积累。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 {/* 综合评价 */}
                 {profile.overall_assessment && (
-                    <div className="bg-white rounded-xl border border-gray-200 p-6">
-                        <h3 className="text-base font-semibold text-gray-900 mb-3">综合评价</h3>
-                        <p className="text-sm text-gray-700 leading-relaxed">
+                    <div className="bg-blue-50/50 rounded-2xl border border-blue-100 p-8 shadow-sm relative overflow-hidden group">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            综合评价
+                        </h3>
+                        <p className="text-base text-gray-700 leading-8 text-justify">
                             {profile.overall_assessment}
                         </p>
                     </div>
@@ -174,28 +218,42 @@ export function AbilityProfileView() {
                 {/* 优势和不足 */}
                 {(profile.key_strengths && profile.key_strengths.length > 0 ||
                     profile.key_weaknesses && profile.key_weaknesses.length > 0) && (
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {profile.key_strengths && profile.key_strengths.length > 0 && (
-                                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                                    <h3 className="text-base font-semibold text-gray-900 mb-3">主要优势</h3>
-                                    <ul className="space-y-2">
+                                <div className="bg-emerald-50/60 rounded-2xl border border-emerald-100 p-6 shadow-sm relative overflow-hidden h-full">
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
+                                    <h3 className="text-lg font-bold text-gray-900 mb-5 flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                            <CheckCircle2 className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-emerald-600">优势</span>
+                                    </h3>
+                                    <ul className="space-y-4">
                                         {profile.key_strengths.map((strength, index) => (
-                                            <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
-                                                <span className="text-teal-600 mt-0.5">✓</span>
-                                                <span>{strength}</span>
+                                            <li key={index} className="flex items-start gap-3">
+                                                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mt-0.5">
+                                                    <Check className="w-3 h-3 stroke-[3px]" />
+                                                </span>
+                                                <span className="text-sm text-gray-700 leading-relaxed">{strength}</span>
                                             </li>
                                         ))}
                                     </ul>
                                 </div>
                             )}
                             {profile.key_weaknesses && profile.key_weaknesses.length > 0 && (
-                                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                                    <h3 className="text-base font-semibold text-gray-900 mb-3">待提升项</h3>
-                                    <ul className="space-y-2">
+                                <div className="bg-orange-50/60 rounded-2xl border border-orange-100 p-6 shadow-sm relative overflow-hidden h-full">
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-orange-500"></div>
+                                    <h3 className="text-lg font-bold text-gray-900 mb-5 flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600">
+                                            <AlertCircle className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-orange-600">待改进</span>
+                                    </h3>
+                                    <ul className="space-y-4">
                                         {profile.key_weaknesses.map((weakness, index) => (
-                                            <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
-                                                <span className="text-amber-600 mt-0.5">△</span>
-                                                <span>{weakness}</span>
+                                            <li key={index} className="flex items-start gap-3">
+                                                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold mt-0.5">!</span>
+                                                <span className="text-sm text-gray-700 leading-relaxed">{weakness}</span>
                                             </li>
                                         ))}
                                     </ul>

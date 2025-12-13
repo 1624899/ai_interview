@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, FileText, Loader2, RefreshCw, AlertCircle, Sparkles, Maximize2 } from "lucide-react";
+import { Upload, FileText, Loader2, RefreshCw, AlertCircle, BrainCircuit, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -206,7 +206,7 @@ export function InterviewSetup({
                     onClick={onStartInterview}
                     disabled={!resume || !jobDescription.trim() || isLoading || !hasApiConfig}
                 >
-                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Sparkles className="mr-2 h-5 w-5" />}
+                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <BrainCircuit className="mr-2 h-5 w-5" />}
                     开始面试
                 </Button>
             </div>

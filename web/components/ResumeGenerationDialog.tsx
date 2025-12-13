@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Loader2, Sparkles, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, Wand2, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -206,7 +206,7 @@ export function ResumeGenerationDialog({
                                     </>
                                 ) : (
                                     <>
-                                        <Sparkles className="mr-2 h-4 w-4" />
+                                        <Wand2 className="mr-2 h-4 w-4" />
                                         开始生成
                                     </>
                                 )}

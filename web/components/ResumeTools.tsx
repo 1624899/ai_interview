@@ -351,10 +351,21 @@ export function ResumeTools({ apiConfig, resumeContent, onResumeChange }: Resume
     const renderAnalyzeResult = () => {
         if (!analyzeResult) return null;
 
+        // 定义维度颜色映射,与 LandingPage.tsx 保持一致
+        const dimensionColors: Record<string, { bar: string; text: string }> = {
+            clarity: { bar: "bg-blue-500", text: "text-blue-600" },
+            job_match: { bar: "bg-blue-500", text: "text-blue-600" },
+            structure: { bar: "bg-teal-500", text: "text-teal-600" },
+            highlights: { bar: "bg-teal-500", text: "text-teal-600" },
+            completeness: { bar: "bg-purple-500", text: "text-purple-600" },
+            quantification: { bar: "bg-purple-500", text: "text-purple-600" },
+        };
+
         const radarData = Object.entries(analyzeResult.dimension_scores).map(([key, value]) => ({
             dimension: key,
             score: value.score / 10,
             label: getDimensionLabel(key),
+            colors: dimensionColors[key] || { bar: "bg-teal-500", text: "text-teal-600" },
         }));
 
         return (
@@ -381,11 +392,11 @@ export function ResumeTools({ apiConfig, resumeContent, onResumeChange }: Resume
                                 <div key={item.dimension} className="p-3 bg-gray-50 rounded-lg">
                                     <div className="flex justify-between items-center mb-1">
                                         <span className="text-sm font-medium">{item.label}</span>
-                                        <span className="text-sm font-bold text-teal-600">{(item.score * 10).toFixed(0)}</span>
+                                        <span className={`text-sm font-bold ${item.colors.text}`}>{(item.score * 10).toFixed(0)}</span>
                                     </div>
                                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                         <div
-                                            className="h-full bg-teal-500 rounded-full transition-all"
+                                            className={`h-full ${item.colors.bar} rounded-full transition-all`}
                                             style={{ width: `${item.score * 10}%` }}
                                         />
                                     </div>
@@ -435,14 +446,58 @@ export function ResumeTools({ apiConfig, resumeContent, onResumeChange }: Resume
 
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">优先改进建议</CardTitle>
+                        <CardTitle className="text-base font-bold text-gray-900">智能优化建议</CardTitle>
+                        <p className="text-xs text-gray-500 mt-1">
+                            不只是指出问题，更提供具体可行的修改方案。P1/P2 优先级划分，让优化有的放矢。
+                        </p>
                     </CardHeader>
                     <CardContent>
-                        <ol className="list-decimal list-inside space-y-2">
-                            {analyzeResult.priority_improvements.map((item, idx) => (
-                                <li key={idx} className="text-sm">{item}</li>
-                            ))}
-                        </ol>
+                        <div className="bg-[#0f172a] rounded-xl p-4 space-y-3">
+                            {analyzeResult.priority_improvements.map((item, idx) => {
+                                // 解析内容: 预期格式 "P1 标题 内容"
+                                const match = item.match(/^(P\d+)\s+(.+?)[:：]?\s+(.+)$/);
+                                let priority = match ? match[1] : `P${idx + 1}`;
+                                let title = match ? match[2] : "优化点";
+                                let content = match ? match[3] : item;
+
+                                // 处理 fallback 情况: 如果没匹配上但以 P数字 开头
+                                if (!match && /^(P\d+)/.test(item)) {
+                                    const parts = item.split(' ');
+                                    if (parts.length > 1) {
+                                        priority = parts[0];
+                                        content = item.substring(parts[0].length).trim();
+                                        // 尝试提取标题 (假设第二部分是标题，之后是内容)
+                                        if (parts.length > 2) {
+                                            title = parts[1];
+                                            content = item.substring(parts[0].length + parts[1].length + 2).trim();
+                                        }
+                                    }
+                                }
+
+                                const isP1 = priority === 'P1';
+
+                                return (
+                                    <div key={idx} className="bg-[#1e293b] rounded-lg p-3 border border-slate-700">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className={`
+                                                px-1.5 py-0.5 rounded text-xs font-bold
+                                                ${isP1
+                                                    ? 'bg-red-500/20 text-red-400'
+                                                    : 'bg-orange-500/20 text-orange-400'}
+                                            `}>
+                                                {priority}
+                                            </span>
+                                            <span className="text-sm font-bold text-white">
+                                                {title}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                            {content}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </CardContent>
                 </Card>
 

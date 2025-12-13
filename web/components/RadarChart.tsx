@@ -46,36 +46,38 @@ export function AbilityRadarChart({ data }: Props) {
         <div className="w-full">
             <ResponsiveContainer width="100%" height={400}>
                 <RadarChart data={chartData}>
-                    <PolarGrid stroke="#d1d5db" />
+                    <PolarGrid stroke="#2DD4BF" strokeOpacity={0.2} />
                     <PolarAngleAxis
                         dataKey="dimension"
-                        tick={{ fill: '#4b5563', fontSize: 13, fontWeight: 500 }}
+                        tick={{ fill: '#94a3b8', fontSize: 13, fontWeight: 500 }}
                     />
                     <PolarRadiusAxis
                         domain={[0, 10]}
-                        tick={{ fill: '#9ca3af', fontSize: 11 }}
+                        tick={{ fill: '#64748b', fontSize: 11 }}
                         tickCount={6}
                     />
                     <Radar
                         name="能力评分"
                         dataKey="score"
-                        stroke="#2065ceff"
-                        fill="#43bcecff"
-                        fillOpacity={0.4}
+                        stroke="#2DD4BF"
+                        fill="#2DD4BF"
+                        fillOpacity={0.3}
                         strokeWidth={2}
                     />
                     <Tooltip
                         contentStyle={{
-                            backgroundColor: 'white',
-                            border: '1px solid #e5e7eb',
+                            backgroundColor: '#1e293b',
+                            border: '1px solid #334155',
                             borderRadius: '8px',
-                            padding: '8px 12px'
+                            padding: '8px 12px',
+                            color: '#e2e8f0'
                         }}
                         formatter={(value: number) => [`${value} / 10`, '评分']}
                     />
                     <Legend
                         wrapperStyle={{
-                            paddingTop: '20px'
+                            paddingTop: '20px',
+                            color: '#94a3b8'
                         }}
                     />
                 </RadarChart>

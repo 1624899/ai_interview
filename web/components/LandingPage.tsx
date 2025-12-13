@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, FileText, Sparkles, ArrowRight, CheckCircle2, TrendingUp, Calendar, Zap, Star, Download, Copy, X } from "lucide-react";
+import { Bot, FileText, Stethoscope, Wand2, ArrowRight, CheckCircle2, TrendingUp, Calendar, Zap, Star, Download, Copy, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -121,7 +121,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                                 </div>
                                 <div className="flex items-start gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
-                                        <Sparkles className="w-5 h-5 text-gray-700" />
+                                        <Stethoscope className="w-5 h-5 text-gray-700" />
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-gray-900">专家精确会诊</h4>
@@ -220,7 +220,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                                 {/* 添加按钮 */}
                                 <div className="absolute -bottom-5 -right-5">
                                     <button className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center text-white shadow-xl hover:scale-110 transition-transform">
-                                        <Sparkles className="w-6 h-6" />
+                                        <Wand2 className="w-6 h-6" />
                                     </button>
                                 </div>
                             </div>
@@ -342,8 +342,8 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                                                 { label: "JD匹配", val: 93, color: "bg-blue-500", textColor: "text-blue-600" },
                                                 { label: "结构规范", val: 92, color: "bg-teal-500", textColor: "text-teal-600" },
                                                 { label: "亮点突出", val: 90, color: "bg-teal-500", textColor: "text-teal-600" },
-                                                { label: "内容完整", val: 90, color: "bg-indigo-500", textColor: "text-indigo-600" },
-                                                { label: "量化程度", val: 95, color: "bg-indigo-500", textColor: "text-indigo-600" }
+                                                { label: "内容完整", val: 90, color: "bg-purple-500", textColor: "text-purple-600" },
+                                                { label: "量化程度", val: 95, color: "bg-purple-500", textColor: "text-purple-600" }
                                             ].map(item => (
                                                 <div key={item.label} className="space-y-2">
                                                     <div className="flex justify-between items-center">
@@ -561,7 +561,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                                 <div className="relative z-10">
                                     <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-white mb-6 backdrop-blur-sm">
-                                        <Sparkles className="w-6 h-6" />
+                                        <Wand2 className="w-6 h-6" />
                                     </div>
                                     <h3 className="text-2xl font-bold mb-4">专家级简历智能生成</h3>
                                     <p className="text-gray-400 text-lg mb-8 leading-relaxed">

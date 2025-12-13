@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, RefreshCw, X, Sparkles } from 'lucide-react';
+import { Loader2, RefreshCw, X, Brain, CheckCircle2, Check, AlertCircle } from 'lucide-react';
 import { getSessionProfile, type AbilityProfile } from '@/lib/api/profile';
 import { AbilityRadarChart } from './RadarChart';
 import { SkillTags } from './SkillTags';
@@ -49,7 +49,7 @@ export function SessionProfileDialog({ sessionId, open, onOpenChange }: Props) {
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-teal-600" />
+                        <Brain className="w-5 h-5 text-teal-600" />
                         本轮面试能力评估
                     </DialogTitle>
                 </DialogHeader>
@@ -94,14 +94,14 @@ export function SessionProfileDialog({ sessionId, open, onOpenChange }: Props) {
 
                         {/* 技能标签 */}
                         {profile.skill_tags && profile.skill_tags.length > 0 && (
-                            <div className="bg-gray-50 rounded-xl p-6">
+                            <div className="bg-blue-50 rounded-xl p-6">
                                 <SkillTags tags={profile.skill_tags} />
                             </div>
                         )}
 
                         {/* 综合评价 */}
                         {profile.overall_assessment && (
-                            <div className="bg-gray-50 rounded-xl p-6">
+                            <div className="bg-purple-50 rounded-xl p-6">
                                 <h3 className="text-base font-semibold text-gray-900 mb-3">综合评价</h3>
                                 <p className="text-sm text-gray-700 leading-relaxed">
                                     {profile.overall_assessment}
@@ -114,7 +114,7 @@ export function SessionProfileDialog({ sessionId, open, onOpenChange }: Props) {
                             profile.key_weaknesses && profile.key_weaknesses.length > 0) && (
                                 <div className="grid grid-cols-2 gap-4">
                                     {profile.key_strengths && profile.key_strengths.length > 0 && (
-                                        <div className="bg-gray-50 rounded-xl p-6">
+                                        <div className="bg-emerald-50 rounded-xl p-6">
                                             <h3 className="text-base font-semibold text-gray-900 mb-3">主要优势</h3>
                                             <ul className="space-y-2">
                                                 {profile.key_strengths.map((strength, index) => (
@@ -127,7 +127,7 @@ export function SessionProfileDialog({ sessionId, open, onOpenChange }: Props) {
                                         </div>
                                     )}
                                     {profile.key_weaknesses && profile.key_weaknesses.length > 0 && (
-                                        <div className="bg-gray-50 rounded-xl p-6">
+                                        <div className="bg-orange-50 rounded-xl p-6">
                                             <h3 className="text-base font-semibold text-gray-900 mb-3">待提升项</h3>
                                             <ul className="space-y-2">
                                                 {profile.key_weaknesses.map((weakness, index) => (

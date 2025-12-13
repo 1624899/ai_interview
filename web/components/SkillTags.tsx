@@ -14,7 +14,7 @@ export function SkillTags({ tags }: Props) {
                 {tags.map((tag, index) => (
                     <span
                         key={index}
-                        className="px-3 py-1.5 bg-blue-500 text-white rounded-full text-sm font-medium shadow-sm hover:bg-blue-600 transition-colors"
+                        className="px-3 py-1.5 bg-white text-blue-600 border border-blue-400 rounded-xl text-sm font-medium hover:bg-blue-50 hover:border-blue-500 transition-colors"
                     >
                         {tag}
                     </span>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Bot, FileText, ArrowLeft, Upload, Settings, MessageSquare, FileOutput, Search, PenTool, UserCheck, Layout, Sparkles } from "lucide-react";
+import { Bot, FileText, ArrowLeft, Upload, Settings, MessageSquare, FileOutput, Search, PenTool, UserCheck, Layout, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface GuidePageProps {
@@ -23,7 +23,7 @@ export function GuidePage({ onBack }: GuidePageProps) {
                         </Button>
                         <div className="font-bold text-xl text-gray-900 flex items-center gap-2">
                             <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center text-white shadow-md">
-                                <Sparkles className="w-5 h-5" />
+                                <BookOpen className="w-5 h-5" />
                             </div>
                             使用指南
                         </div>

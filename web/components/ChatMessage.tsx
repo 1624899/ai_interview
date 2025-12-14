@@ -199,15 +199,17 @@ export function ChatMessage({ role, content, timestamp, isStreaming, onEdit, onC
                                 >
                                     {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                                 </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-gray-400 hover:text-teal-600 hover:bg-teal-50"
-                                    onClick={onRegenerate}
-                                    title="重新生成"
-                                >
-                                    <RefreshCw className="h-3.5 w-3.5" />
-                                </Button>
+                                {onRegenerate && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-gray-400 hover:text-teal-600 hover:bg-teal-50"
+                                        onClick={onRegenerate}
+                                        title="重新生成"
+                                    >
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                    </Button>
+                                )}
                             </div>
                         )}
                     </>

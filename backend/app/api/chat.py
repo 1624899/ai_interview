@@ -25,6 +25,63 @@ router = APIRouter(prefix="/api/chat", tags=["聊天"])
 session_service = SessionService()
 
 
+@router.get("/hint/{session_id}/{question_index}")
+async def get_hint(session_id: str, question_index: int):
+    """
+    获取指定问题的回答提示
+    
+    直接从 interview_plan 中读取，无需调用 LLM
+    
+    Args:
+        session_id: 会话ID
+        question_index: 当前问题索引（从0开始）
+        
+    Returns:
+        dict: 包含提示内容
+    """
+    try:
+        plan = await session_service.get_interview_plan(session_id)
+        
+        if not plan:
+            raise HTTPException(status_code=404, detail="面试计划不存在")
+        
+        if question_index < 0 or question_index >= len(plan):
+            raise HTTPException(status_code=404, detail="问题索引超出范围")
+        
+        question = plan[question_index]
+        hint = question.get("hint")
+        
+        # 检查提示是否已生成
+        if not hint:
+            return {
+                "success": True,
+                "generating": True,
+                "hint": "提示正在生成中，请稍后再试...",
+                "topic": question.get("topic", ""),
+                "question": question.get("content", "")
+            }
+        
+        return {
+            "success": True,
+            "generating": False,
+            "hint": hint,
+            "topic": question.get("topic", ""),
+            "question": question.get("content", "")
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取回答提示失败: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "InternalServerError",
+                "message": "获取回答提示失败"
+            }
+        )
+
+
 @router.post("/start")
 async def start_interview(
     request: InterviewStartRequest,

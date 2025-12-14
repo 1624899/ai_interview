@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { PanelLeft, Bot, Loader2, Award, Plus, MessageCircle, FileText, ArrowDown, Square } from "lucide-react";
+import { PanelLeft, Bot, Loader2, Award, Plus, MessageCircle, FileText, ArrowDown, Square, Lightbulb, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ChatMessage";
 import { SessionSidebar } from "@/components/SessionSidebar";
@@ -35,6 +35,8 @@ export default function InterviewPage() {
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [showSessionProfileDialog, setShowSessionProfileDialog] = useState(false);
   const [activeMainTab, setActiveMainTab] = useState<ViewType>("landing");
+  const [hintContent, setHintContent] = useState<string | null>(null);
+  const [isLoadingHint, setIsLoadingHint] = useState(false);
 
   // 持久化视图状态
   useEffect(() => {
@@ -208,6 +210,45 @@ export default function InterviewPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     setShowScrollButton(false);
     setAutoScrollEnabled(true);
+  };
+
+  // 获取回答提示
+  const handleGetHint = async () => {
+    if (!threadId || isLoadingHint) return;
+
+    setIsLoadingHint(true);
+    setHintContent(null);
+
+    try {
+      // 计算当前问题索引：基于 AI 消息数量 - 1（第一条 AI 消息是问题0）
+      const aiMessageCount = messages.filter(m => m.role === 'ai').length;
+      const questionIndex = Math.max(0, aiMessageCount - 1);
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat/hint/${threadId}/${questionIndex}`
+      );
+
+      if (!response.ok) {
+        throw new Error('获取提示失败');
+      }
+
+      const data = await response.json();
+
+      if (data.generating) {
+        // 提示还在生成中，显示生成中状态
+        toast.info('提示正在生成中，请稍后再试', {
+          duration: 2000,
+        });
+      } else {
+        setHintContent(data.hint);
+      }
+
+    } catch (error) {
+      console.error('获取提示失败:', error);
+      toast.error('获取提示失败，请稍后重试');
+    } finally {
+      setIsLoadingHint(false);
+    }
   };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -477,7 +518,7 @@ export default function InterviewPage() {
                       content={msg.content}
                       timestamp={msg.timestamp}
                       onEdit={msg.role === 'user' ? (content) => handleEditMessage(index, content) : undefined}
-                      onRegenerate={msg.role === 'ai' ? () => handleRegenerateMessage(index) : undefined}
+                      onRegenerate={msg.role === 'ai' && index !== 0 ? () => handleRegenerateMessage(index) : undefined}
                     />
                   ))}
 
@@ -676,6 +717,31 @@ export default function InterviewPage() {
                       </div>
                     )}
 
+                  {/* 回答提示显示区域 */}
+                  {hintContent && (
+                    <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                          <Lightbulb className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className="font-medium text-amber-800 text-sm">回答提示</h4>
+                            <button
+                              onClick={() => setHintContent(null)}
+                              className="p-1 hover:bg-amber-100 rounded-full transition-colors"
+                            >
+                              <X className="w-4 h-4 text-amber-600" />
+                            </button>
+                          </div>
+                          <p className="text-sm text-amber-700 leading-relaxed whitespace-pre-wrap">
+                            {hintContent}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* 判断面试是否已完成 */}
                   {(() => {
                     const isInterviewCompleted = !!(interviewProgress && interviewProgress.current >= interviewProgress.total);
@@ -690,11 +756,28 @@ export default function InterviewPage() {
                             placeholder={isInterviewCompleted ? "本轮面试已结束" : "输入您的回答..."}
                             disabled={isStreaming || isInterviewCompleted}
                             className={cn(
-                              "w-full resize-none rounded-2xl border border-gray-200 py-3 pl-4 pr-12 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-50 min-h-[120px] max-h-[200px]",
+                              "w-full resize-none rounded-2xl border border-gray-200 py-3 pl-4 pr-24 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-50 min-h-[120px] max-h-[200px]",
                               isInterviewCompleted && "bg-gray-50 cursor-not-allowed opacity-60"
                             )}
                             rows={4}
                           />
+                          {/* 获取提示按钮 */}
+                          <button
+                            onClick={handleGetHint}
+                            disabled={isInterviewCompleted || isLoadingHint || !threadId}
+                            title="获取回答提示"
+                            className={cn(
+                              "absolute right-12 bottom-3 p-2 rounded-full transition-colors",
+                              isLoadingHint ? "bg-amber-100 text-amber-500" : "hover:bg-amber-50 text-amber-400 hover:text-amber-500",
+                              (isInterviewCompleted || !threadId) && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            {isLoadingHint ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <Lightbulb className="w-5 h-5" />
+                            )}
+                          </button>
                           {/* 语音按钮 */}
                           <button
                             onClick={toggleListening}

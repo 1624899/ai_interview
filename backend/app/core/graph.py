@@ -48,6 +48,7 @@ class InterviewQuestion(BaseModel):
     topic: str = Field(description="考察主题，如Java并发")
     content: str = Field(description="具体的问题描述")
     type: str = Field(description="题目类型：intro, tech, behavior, system_design")
+    hint: str = Field(default="", description="回答提示，帮助候选人组织回答思路")
 
 
 class PlanOutput(BaseModel):
@@ -96,6 +97,84 @@ class InterviewState(TypedDict):
 # ============================================================================
 # 节点函数
 # ============================================================================
+
+async def _generate_hints_async(
+    session_id: str,
+    interview_plan: list,
+    resume: str,
+    job_desc: str,
+    api_config: dict = None
+):
+    """
+    异步生成回答提示（后台任务）
+    
+    使用 fast 模型为每道题目生成回答提示，完成后更新数据库
+    """
+    try:
+        logger.info(f"[HintGenerator] 开始为会话 {session_id} 生成回答提示")
+        
+        # 使用 fast 模型
+        fast_llm = llms.get_llm_for_request(api_config, channel="fast")
+        
+        # 构建所有问题的提示生成 prompt
+        questions_text = "\n".join([
+            f"{i+1}. [{q.get('topic', '')}] {q.get('content', '')}"
+            for i, q in enumerate(interview_plan)
+        ])
+        
+        prompt = f"""你是一位面试辅导专家。以下是面试官将要问候选人的问题列表。
+请为每道题目生成简洁的回答提示，帮助候选人组织回答思路。
+
+【面试问题列表】：
+{questions_text}
+
+请为每道题生成回答提示，格式要求：
+1. 每道题的提示控制在50-100字
+2. 提示应包含：回答的角度、需要涵盖的要点、可以举例的方向
+3. 不要直接给出答案，而是引导思路
+
+请严格按照以下 JSON 格式输出，标点符号使用英文格式，不要包含 markdown 格式，不要有emoji表情：
+{{
+    "hints": [
+        "第1题的回答提示...",
+        "第2题的回答提示...",
+        ...
+    ]
+}}
+"""
+        
+        response = await fast_llm.ainvoke(prompt)
+        response_text = response.content if hasattr(response, 'content') else str(response)
+        
+        # 解析 JSON
+        cleaned_text = response_text.strip()
+        if cleaned_text.startswith("```json"):
+            cleaned_text = cleaned_text[7:]
+        if cleaned_text.startswith("```"):
+            cleaned_text = cleaned_text[3:]
+        if cleaned_text.endswith("```"):
+            cleaned_text = cleaned_text[:-3]
+        cleaned_text = cleaned_text.strip()
+        
+        hints_data = json.loads(cleaned_text)
+        hints_list = hints_data.get("hints", [])
+        
+        # 将提示合并到 interview_plan
+        for i, q in enumerate(interview_plan):
+            if i < len(hints_list):
+                q["hint"] = hints_list[i]
+            else:
+                q["hint"] = "可以结合自身经验，从实际案例出发进行回答。"
+        
+        # 更新数据库
+        from app.database.session_service import SessionService
+        service = SessionService()
+        await service.save_interview_plan(session_id, interview_plan)
+        
+        logger.info(f"[HintGenerator] 会话 {session_id} 的回答提示已生成并保存")
+        
+    except Exception as e:
+        logger.error(f"[HintGenerator] 生成回答提示失败: {str(e)}", exc_info=True)
 
 async def node_planner(state: InterviewState):
     """
@@ -190,7 +269,7 @@ async def node_planner(state: InterviewState):
     {strategy['requirements']}
     
     请严格按照以下 JSON 结构输出，确保包含所有字段。
-    【重要】：不要包含 markdown 格式（如 ```json ... ```），只输出纯 JSON 字符串。
+    【重要】：不要包含 markdown 格式（如 ```json ... ```），只输出纯 JSON 字符串，使用英文字符，禁止使用emoji。
     {{
         "questions": [
             {{
@@ -251,6 +330,17 @@ async def node_planner(state: InterviewState):
             from app.database.session_service import SessionService
             service = SessionService()
             await service.save_interview_plan(session_id, interview_plan)
+            
+            # 异步生成回答提示（后台任务，不阻塞主流程）
+            asyncio.create_task(_generate_hints_async(
+                session_id=session_id,
+                interview_plan=interview_plan,
+                resume=resume,
+                job_desc=job_desc,
+                api_config=api_config
+            ))
+            logger.info(f"已触发后台提示生成任务: {session_id}")
+            
         except Exception as e:
             logger.error(f"保存 interview_plan 到数据库失败: {e}")
     

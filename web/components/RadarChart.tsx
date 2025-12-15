@@ -72,7 +72,7 @@ export function AbilityRadarChart({ data }: Props) {
                             padding: '8px 12px',
                             color: '#e2e8f0'
                         }}
-                        formatter={(value: number) => [`${value} / 10`, '评分']}
+                        formatter={(value) => [`${value} / 10`, '评分']}
                     />
                     <Legend
                         wrapperStyle={{

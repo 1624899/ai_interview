@@ -532,7 +532,7 @@ export function SettingsDialog({
 
                                     <div className="flex items-start gap-2 p-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg">
                                         <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                                        <p>注意：由于免费模型存在并发限制，匹配分析师、内容优化师、HR审核官只允许一个配置免费模型。deepseekv3与deepseekchat是同一模型</p>
+                                        <p>注意：由于免费模型存在并发限制，匹配分析师、内容优化师、HR审核官只允许一个配置免费模型。deepseekv3.2与deepseekchat是同一模型</p>
                                     </div>
 
                                     {/* 通用任务（简历分析 + 主持人） */}
@@ -564,7 +564,7 @@ export function SettingsDialog({
                                         <label className="flex items-center gap-2 text-sm text-gray-600">
                                             <Users className="w-4 h-4 text-blue-500" />
                                             匹配分析师
-                                            <span className="text-xs text-gray-400">（JD关键词匹配，推荐deepseekv3）</span>
+                                            <span className="text-xs text-gray-400">（JD关键词匹配，推荐deepseekv3.2）</span>
                                         </label>
                                         <div className="relative">
                                             <select
@@ -588,7 +588,7 @@ export function SettingsDialog({
                                         <label className="flex items-center gap-2 text-sm text-gray-600">
                                             <PenTool className="w-4 h-4 text-green-500" />
                                             内容优化师
-                                            <span className="text-xs text-gray-400">（内容重写建议，推荐deepseekv3/kimi-k2）</span>
+                                            <span className="text-xs text-gray-400">（内容重写建议，推荐deepseekv3.2/kimi-k2）</span>
                                         </label>
                                         <div className="relative">
                                             <select
@@ -612,7 +612,7 @@ export function SettingsDialog({
                                         <label className="flex items-center gap-2 text-sm text-gray-600">
                                             <UserCheck className="w-4 h-4 text-orange-500" />
                                             HR审核官
-                                            <span className="text-xs text-gray-400">（模拟HR筛选，推荐deepseekv3/minimax）</span>
+                                            <span className="text-xs text-gray-400">（模拟HR筛选，推荐deepseekv3.2/minimax）</span>
                                         </label>
                                         <div className="relative">
                                             <select

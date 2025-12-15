@@ -112,25 +112,98 @@ export function ResumePreviewDialog({
                 <style>
                     ${styles}
 
+                    /* 基础样式重置 */
+                    * {
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                    }
                     
                     /* 屏幕显示样式 (打印预览前的样子) */
                     body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                        line-height: 1.6;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        line-height: 1.5;
                         color: #1a1a1a;
-                        background: #f0f2f5; /* 灰色背景 */
+                        background: #f0f2f5;
                         padding: 20px;
                         display: flex;
                         justify-content: center;
+                        font-size: 12px;
                     }
                     #resume-content-wrapper {
                         background: white;
-                        width: 210mm; /* A4 宽度 */
-                        min-height: 297mm; /* A4 高度 */
-                        padding: 20mm; /* 标准内边距 */
+                        width: 210mm;
+                        min-height: 297mm;
+                        padding: 15mm 18mm;
                         margin: 0 auto;
                         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
                         box-sizing: border-box;
+                    }
+
+                    /* 简历内容样式 */
+                    .resume-content h1 {
+                        font-size: 22px !important;
+                        margin-bottom: 24px !important;
+                        text-align: center;
+                        font-weight: 700;
+                    }
+                    .resume-content h2 {
+                        font-size: 14px !important;
+                        margin-top: 12px !important;
+                        margin-bottom: 6px !important;
+                        padding-bottom: 3px !important;
+                        border-bottom: 1.5px solid #1a1a1a !important;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }
+                    .resume-content h3 {
+                        font-size: 13px !important;
+                        margin-top: 8px !important;
+                        margin-bottom: 3px !important;
+                        font-weight: 600;
+                    }
+                    .resume-content p {
+                        font-size: 12px !important;
+                        line-height: 1.5 !important;
+                        margin-bottom: 4px !important;
+                        color: #333;
+                    }
+                    .resume-content blockquote {
+                        font-size: 11px !important;
+                        text-align: center;
+                        margin: 4px 0 25px 0 !important;
+                        background: #f8f9fa;
+                        border: none !important;
+                        border-radius: 4px;
+                        color: #555;
+                    }
+                    .resume-content blockquote p {
+                        margin: 0 !important;
+                    }
+                    .resume-content ul, .resume-content ol {
+                        font-size: 12px !important;
+                        margin: 4px 0 6px 0 !important;
+                        padding-left: 18px !important;
+                    }
+                    .resume-content li {
+                        margin-bottom: 2px !important;
+                        line-height: 1.45 !important;
+                    }
+                    .resume-content strong {
+                        font-weight: 600;
+                    }
+                    
+                    /* 照片样式 */
+                    .resume-content img {
+                        width: 75px !important;
+                        height: 90px !important;
+                        object-fit: cover;
+                        border-radius: 2px;
+                    }
+                    .resume-content .absolute {
+                        position: absolute;
+                        top: 15mm !important;
+                        right: 18mm !important;
                     }
 
                     /* 打印样式 */
@@ -139,15 +212,54 @@ export function ResumePreviewDialog({
                             margin: 0;
                             padding: 0;
                             background: white !important;
-                            display: block; /* 恢复 block 显示 */
+                            display: block;
+                            font-size: 13px;
                         }
                         #resume-content-wrapper {
                             margin: 0 !important;
-                            padding: 40px !important; 
+                            padding: 10mm 12mm !important;
                             box-shadow: none !important;
                             border: none !important;
                             width: 100% !important;
                             min-height: auto !important;
+                        }
+                        .resume-content h1 {
+                            font-size: 24px !important;
+                            margin-bottom: 12px !important;
+                            padding-right: 100px !important;
+                        }
+                        .resume-content h2 {
+                            font-size: 15px !important;
+                            margin-top: 12px !important;
+                            margin-bottom: 6px !important;
+                        }
+                        .resume-content h3 {
+                            font-size: 14px !important;
+                            margin-top: 8px !important;
+                        }
+                        .resume-content p, .resume-content li {
+                            font-size: 13px !important;
+                            line-height: 1.5 !important;
+                        }
+                        .resume-content blockquote {
+                            font-size: 12px !important;
+                            margin: 4px 0 14px 0 !important;
+                            padding-right: 100px !important;
+                        }
+                        .resume-content ul, .resume-content ol {
+                            margin: 4px 0 6px 0 !important;
+                            padding-left: 18px !important;
+                        }
+                        .resume-content li {
+                            margin-bottom: 2px !important;
+                        }
+                        .resume-content img {
+                            width: 75px !important;
+                            height: 90px !important;
+                        }
+                        .resume-content .absolute {
+                            top: 10mm !important;
+                            right: 12mm !important;
                         }
                         @page {
                             size: A4;

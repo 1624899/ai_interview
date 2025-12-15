@@ -23,6 +23,7 @@ import {
     ResumeOptimizeResult,
     ApiConfig,
     OptimizeProgressEvent,
+    OptimizeWarningEvent,
     updateGeneratedResume,
 } from "@/lib/api/resume";
 import { API_BASE_URL, getUserId } from "@/lib/api/config";
@@ -242,12 +243,26 @@ export function ResumeTools({ apiConfig, resumeContent, onResumeChange }: Resume
                 },
                 (event: OptimizeProgressEvent) => {
                     setOptimizeProgress(event.message);
+                },
+                (event: OptimizeWarningEvent) => {
+                    // 显示节点失败警告
+                    toast.warning(`${event.node} 分析失败`, {
+                        description: "API 返回异常，部分分析结果可能不完整",
+                        duration: 5000,
+                    });
                 }
             );
 
             if (response.success && response.result) {
                 setOptimizeResult(response.result);
-                toast.success("优化建议生成完成");
+                // 如果有警告，在成功消息中提醒用户
+                if (response.warnings && response.warnings.length > 0) {
+                    toast.success(`优化建议生成完成（${response.warnings.length} 个节点异常）`, {
+                        description: "部分专家节点返回异常，结果可能不完整",
+                    });
+                } else {
+                    toast.success("优化建议生成完成");
+                }
                 // 刷新侧边栏历史记录，完成后自动选中新记录
                 await fetchResumeResults();
                 if (response.result_id) {

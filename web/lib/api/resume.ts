@@ -58,6 +58,7 @@ export interface ResumeOptimizeResult {
         risk_warnings: string[];
         quality_score: number;
     };
+    node_errors?: Array<{ node: string; error: string }>;
 }
 
 export interface CompletedSession {
@@ -277,13 +278,20 @@ export interface OptimizeErrorEvent {
     content: string;
 }
 
-export type OptimizeStreamEvent = OptimizeProgressEvent | OptimizeResultEvent | OptimizeDoneEvent | OptimizeErrorEvent;
+export interface OptimizeWarningEvent {
+    type: 'warning';
+    node: string;
+    message: string;
+}
+
+export type OptimizeStreamEvent = OptimizeProgressEvent | OptimizeResultEvent | OptimizeDoneEvent | OptimizeErrorEvent | OptimizeWarningEvent;
 
 /**
  * 简历内容优化 (SSE 流式)
  * 
  * @param params 优化参数
  * @param onProgress 进度回调
+ * @param onWarning 警告回调（当节点失败时调用）
  * @returns 最终结果
  */
 export async function optimizeResumeStreaming(
@@ -294,12 +302,14 @@ export async function optimizeResumeStreaming(
         include_overall_profile?: boolean;
         api_config: ApiConfig;
     },
-    onProgress?: (event: OptimizeProgressEvent) => void
+    onProgress?: (event: OptimizeProgressEvent) => void,
+    onWarning?: (event: OptimizeWarningEvent) => void
 ): Promise<{
     success: boolean;
     result?: ResumeOptimizeResult;
     result_id?: number;
     message?: string;
+    warnings?: Array<{ node: string; message: string }>;
 }> {
     try {
         const response = await fetch(`${API_BASE_URL}/api/resume/optimize/stream`, {
@@ -330,6 +340,7 @@ export async function optimizeResumeStreaming(
         let buffer = '';
         let finalResult: ResumeOptimizeResult | undefined;
         let resultId: number | undefined;
+        const warnings: Array<{ node: string; message: string }> = [];
 
         while (true) {
             const { done, value } = await reader.read();
@@ -346,6 +357,11 @@ export async function optimizeResumeStreaming(
 
                         if (event.type === 'progress' && onProgress) {
                             onProgress(event);
+                        } else if (event.type === 'warning') {
+                            warnings.push({ node: event.node, message: event.message });
+                            if (onWarning) {
+                                onWarning(event);
+                            }
                         } else if (event.type === 'result') {
                             finalResult = event.data;
                         } else if (event.type === 'done') {
@@ -354,16 +370,21 @@ export async function optimizeResumeStreaming(
                             throw new Error(event.content);
                         }
                     } catch (e) {
-                        // 解析错误，跳过
+                        // 只忽略 JSON 解析错误，其他错误应该抛出
+                        if (e instanceof SyntaxError) {
+                            console.warn('SSE 解析跳过:', line);
+                        } else {
+                            throw e;
+                        }
                     }
                 }
             }
         }
 
         if (finalResult) {
-            return { success: true, result: finalResult, result_id: resultId };
+            return { success: true, result: finalResult, result_id: resultId, warnings: warnings.length > 0 ? warnings : undefined };
         } else {
-            return { success: false, message: '未收到优化结果' };
+            return { success: false, message: '未收到优化结果', warnings: warnings.length > 0 ? warnings : undefined };
         }
 
     } catch (error) {

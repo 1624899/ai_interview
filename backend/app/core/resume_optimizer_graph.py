@@ -712,18 +712,41 @@ async def optimize_resume_streaming(
     state.update(content_result)
     state.update(hr_result)
     
+    # 检测专家节点是否失败，发送警告
+    node_errors = []
+    if match_result.get("match_analysis", {}).get("error"):
+        error_msg = match_result["match_analysis"]["error"]
+        node_errors.append({"node": "匹配分析师", "error": error_msg})
+        yield {"type": "warning", "node": "匹配分析师", "message": f"匹配分析师节点失败: {error_msg}"}
+    if content_result.get("content_suggestions", {}).get("error"):
+        error_msg = content_result["content_suggestions"]["error"]
+        node_errors.append({"node": "内容优化师", "error": error_msg})
+        yield {"type": "warning", "node": "内容优化师", "message": f"内容优化师节点失败: {error_msg}"}
+    if hr_result.get("hr_review", {}).get("error"):
+        error_msg = hr_result["hr_review"]["error"]
+        node_errors.append({"node": "HR审核官", "error": error_msg})
+        yield {"type": "warning", "node": "HR审核官", "message": f"HR审核官节点失败: {error_msg}"}
+    
     yield {"type": "progress", "stage": "experts", "message": "专家分析阶段完成", "complete": True}
     
     # 3. 主持人整合
     yield {"type": "progress", "stage": "moderator", "message": "主持人正在整合专家意见..."}
     moderator_result = await node_moderator(state)
     state.update(moderator_result)
+    if moderator_result.get("moderator_summary", {}).get("error"):
+        error_msg = moderator_result["moderator_summary"]["error"]
+        node_errors.append({"node": "主持人", "error": error_msg})
+        yield {"type": "warning", "node": "主持人", "message": f"主持人节点失败: {error_msg}"}
     yield {"type": "progress", "stage": "moderator", "message": "意见整合完成", "complete": True}
     
     # 4. 反思阶段
     yield {"type": "progress", "stage": "reflect", "message": "正在进行质量审核..."}
     reflect_result = await node_reflect(state)
     state.update(reflect_result)
+    if reflect_result.get("reflection", {}).get("error"):
+        error_msg = reflect_result["reflection"]["error"]
+        node_errors.append({"node": "反思节点", "error": error_msg})
+        yield {"type": "warning", "node": "反思节点", "message": f"反思节点失败: {error_msg}"}
     yield {"type": "progress", "stage": "reflect", "message": "质量审核完成", "complete": True}
     
     # 5. 精炼阶段（根据反思结果优化方案）
@@ -736,6 +759,10 @@ async def optimize_resume_streaming(
     yield {"type": "progress", "stage": "finalize", "message": "正在生成最终结果..."}
     final_result = await node_finalize(state)
     state.update(final_result)
+    
+    # 将节点错误信息添加到最终结果中
+    if node_errors:
+        state["final_result"]["node_errors"] = node_errors
     
     logger.info("简历内容优化完成（流式）")
     

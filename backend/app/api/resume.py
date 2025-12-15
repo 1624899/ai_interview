@@ -528,6 +528,45 @@ async def get_generated_resume(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.put("/generated/{resume_id}")
+async def update_generated_resume(
+    resume_id: int,
+    request: dict,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
+    """
+    更新生成的简历内容
+    """
+    user_id = x_user_id or "default_user"
+    
+    # 获取请求参数
+    content = request.get("content")
+    title = request.get("title")
+    
+    if not content and not title:
+        raise HTTPException(status_code=400, detail="至少需要提供 content 或 title 参数")
+    
+    try:
+        service = get_generation_service()
+        success = await service.update_generated_resume(
+            resume_id=resume_id,
+            user_id=user_id,
+            content=content,
+            title=title
+        )
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="简历不存在或无权更新")
+        
+        return {"success": True, "message": "更新成功"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新生成的简历失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/generated/{resume_id}")
 async def delete_generated_resume(
     resume_id: int,

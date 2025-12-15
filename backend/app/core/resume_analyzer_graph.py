@@ -43,8 +43,7 @@ class DimensionScoreOutput(BaseModel):
 
 
 class ResumeAnalysisOutput(BaseModel):
-    """简历分析输出"""
-    overall_score: float = Field(description="综合评分 (0-100)")
+    """简历分析输出（由 AI 生成，综合评分由系统计算）"""
     dimension_scores: Dict[str, DimensionScoreOutput] = Field(description="各维度评分")
     strengths: List[str] = Field(description="优势")
     weaknesses: List[str] = Field(description="不足")
@@ -152,10 +151,9 @@ async def node_analyze(state: ResumeAnalyzerState) -> dict:
 
 {"基于面试对话，请特别指出简历中与面试表现不一致的地方，或面试中展现但简历未体现的能力。" if interview_conversations else ""}
 
-**重要：请严格按照以下 JSON 格式输出，所有字符串必须使用英文双引号 \" 而非中文引号，确保所有括号正确闭合，不要使用 markdown 代码块：**
+**重要：请严格按照以下 JSON 格式输出，所有字符串必须使用英文双引号 \" 而非中文引号，确保所有括号正确闭合，不要使用 markdown 代码块。**
 
 {{
-    "overall_score": 75,
     "dimension_scores": {{
         "structure": {{"score": 80, "comment": "结构清晰专业，模块划分合理"}},
         "completeness": {{"score": 70, "comment": "教育和工作经历完整，缺少项目详情"}},
@@ -225,12 +223,34 @@ async def node_analyze(state: ResumeAnalyzerState) -> dict:
                 logger.error(f"JSON 修复失败，完整内容:\n{content}")
                 raise
         
-        logger.info(f"简历分析完成，综合评分: {analysis_result.get('overall_score', 0)}")
+        logger.info(f"简历分析 JSON 解析成功")
+        
+        # Pydantic Schema 校验
+        try:
+            validated_output = ResumeAnalysisOutput(**analysis_result)
+            analysis_result = validated_output.model_dump()
+            logger.info("Schema 校验通过")
+        except Exception as e:
+            logger.warning(f"Schema 校验失败，使用原始数据: {e}")
         
         # 清理 interview_insights 字段：确保 "null" 字符串被转为 None
         insights = analysis_result.get("interview_insights")
         if insights is None or (isinstance(insights, str) and insights.lower() in ("null", "")):
             analysis_result["interview_insights"] = None
+        
+        # 机器计算综合评分：取各维度评分的平均值
+        dimension_scores = analysis_result.get("dimension_scores", {})
+        if dimension_scores:
+            scores = []
+            for dim_key, dim_value in dimension_scores.items():
+                if isinstance(dim_value, dict) and "score" in dim_value:
+                    scores.append(dim_value["score"])
+                elif hasattr(dim_value, "score"):  # Pydantic 对象
+                    scores.append(dim_value.score)
+            if scores:
+                calculated_overall = round(sum(scores) / len(scores), 1)
+                logger.info(f"机器计算综合评分: {calculated_overall}")
+                analysis_result["overall_score"] = calculated_overall
         
         return {"analysis_result": analysis_result}
         

@@ -10,11 +10,22 @@ from .config import POSTGRES_CONFIG
 
 logger = logging.getLogger(__name__)
 
+# 初始化状态标记，避免重复执行DDL
+_db_initialized = False
+
 
 async def init_database():
     """
     初始化 PostgreSQL 数据库，创建所有必要的表和索引
+    只在首次调用时执行DDL语句，避免重复创建表和索引
     """
+    global _db_initialized
+    
+    # 如果已经初始化过，直接返回
+    if _db_initialized:
+        logger.debug("数据库已初始化，跳过重复初始化")
+        return
+    
     conn = await asyncpg.connect(**POSTGRES_CONFIG)
     
     try:
@@ -181,6 +192,9 @@ async def init_database():
         # 注意：LangGraph 的 PostgresSaver 会自动创建 checkpoints 和 writes 表
         
         logger.info(f"✓ 数据库初始化完成: {POSTGRES_CONFIG['database']}")
+        
+        # 标记初始化完成
+        _db_initialized = True
         
     except Exception as e:
         logger.error(f"✗ 数据库初始化失败: {e}")

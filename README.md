@@ -28,7 +28,7 @@
 
 ## 📖 项目简介
 
-面面-AI求职助手是一个利用大语言模型（LLM）和 LangGraph 状态机技术构建的综合求职辅助系统。它不仅能进行全真模拟面试，还能像专业的职业咨询师一样，通过多智能体协作（Multi-Agent）对简历进行深度诊断和定向优化，帮助求职者全方位提升竞争力。
+面面-AI求职助手是一个利用大语言模型（LLM）和 LangGraph 状态机技术构建的综合求职辅助系统。它不仅能进行全真模拟面试，还能像专业的职业咨询师一样，通过多智能体协作（Multi-Agent）对简历进行深度诊断和定向优化，帮助求职者全方位提升竞争力。现已上线测试：[面面-AI求职助手](https://interview.1624899.xyz)
 
 ### 🎬 演示
 
@@ -39,6 +39,14 @@
 ---
 
 ## ✨ 功能特性
+
+### 🎙️ 实时语音面试 (New!)
+- **Qwen3-Omni 实时交互**: 使用 Qwen3-Omni 模型实现与 AI 面试官的高性能实时语音对话。
+- **全链路流式体验**: 基于 SSE 实现音频与文本双重响应流。
+- **高级语音工程**: 集成 VAD (语音活动检测) 与浏览器端 STT，确保交互自然。
+- **智能会话克隆**: 支持从文本面试一键克隆至语音模式，完整保留历史上下文。
+- **本地存储优化**: 利用 IndexedDB 缓存用户录音，支持离线多端持久化播放。
+- **进度深度追踪**: 与多轮面试系统联动，精确定位面试问题索引与跟进状态。
 
 ### 📄 智能简历优化与生成 (New!)
 - **多专家协同诊断**: 采用创新圆桌会议架构，由 **匹配分析师**（分析 JD 匹配度）、**内容优化师**（提供修改建议）、**HR 审核官**（模拟筛选视角）三位 AI 专家共同会诊。
@@ -195,6 +203,7 @@ ai-interview/
 │   ├── app/
 │   │   ├── api/                     # 接口路由层
 │   │   │   ├── chat.py              # 面试对话 WebSocket/SSE 接口
+│   │   │   ├── voice_chat.py        # 语音面试实时流接口 ⭐
 │   │   │   ├── resume.py            # 简历优化与生成相关接口
 │   │   │   ├── sessions.py          # 会话管理接口
 │   │   │   ├── upload.py            # 文件上传接口
@@ -202,7 +211,8 @@ ai-interview/
 │   │   │
 │   │   ├── core/                    # 核心业务逻辑 (Agent Graphs)
 │   │   │   ├── graph.py                   # 面试流程状态机 (LangGraph)
-│   │   │   ├── resume_optimizer_graph.py  # 简历优化多专家协同 Agent ⭐
+│   │   │   ├── voice_interview.py         # 语音面试核心引擎 ⭐
+│   │   │   ├── resume_optimizer_graph.py  # 简历优化多专家协同 Agent
 │   │   │   ├── resume_generation_graph.py # 简历生成工作流 Agent
 │   │   │   ├── resume_analyzer_graph.py   # 简历初步分析 Agent
 │   │   │   ├── llms.py                    # LLM 工厂与配置
@@ -212,8 +222,7 @@ ai-interview/
 │   │   │   ├── base.py              # SQLAlchemy 模型定义
 │   │   │   ├── init_db.py           # 数据库初始化脚本
 │   │   │   ├── session_service.py   # 会话数据服务
-│   │   │   ├── resume_service.py    # 简历记录服务
-│   │   │   └── resume_generation_service.py # 生成记录服务
+│   │   │   └── session_services/    # 细分数据管理模块 (会话、消息、画像)
 │   │   │
 │   │   └── services/                # 通用业务服务
 │   │       ├── ability_service.py   # 能力画像计算服务
@@ -227,7 +236,9 @@ ai-interview/
 │   │   └── layout.tsx               # 全局布局
 │   │
 │   ├── components/                  # React 组件
-│   │   ├── ResumeTools.tsx          # 简历工场主容器 ⭐
+│   │   ├── VoiceInterview.tsx       # 实时语音面试界面 ⭐
+│   │   ├── DialogueReview.tsx       # 对话回顾与音频播放
+│   │   ├── ResumeTools.tsx          # 简历工场主容器
 │   │   ├── ResumeGenerationDialog.tsx # 简历生成对话框
 │   │   ├── ResumePreviewDialog.tsx    # 简历预览与导出
 │   │   ├── ResumeHistoryList.tsx      # 历史记录列表
@@ -245,11 +256,14 @@ ai-interview/
 │   │       ├── sessionSlice.ts      # 会话列表状态
 │   │       └── apiConfigSlice.ts    # 模型配置状态
 │   │
+│   ├── hooks/                       # 自定义 Hook
+│   │   ├── useVoiceChat.ts          # 语音交互逻辑核心 ⭐
+│   │   └── useSpeechToText.ts       # 浏览器 STT 封装
+│   │
 │   ├── lib/                         # 工具函数
 │   │   └── api/                     # 前端 API 客户端
 │   │       ├── resume.ts            # 简历相关 API
-│   │       ├── sessions.ts          # 会话相关 API
-│   │       └── profile.ts           # 统计相关 API
+│   │       └── sessions.ts          # 会话相关 API
 │   └── public/                      # 静态资源
 │
 ├── docker-compose.yml               # 容器编排配置
@@ -283,10 +297,14 @@ docker-compose --env-file .env.production up -d --build
   - [x] 会话持久化 (PostgreSQL)
   - [x] Docker 一键部署
 
+- [x] **语音交互 (Real-time Omnichannel)**
+  - [x] Qwen3-Omni 高性能流式响应
+  - [x] VAD 与多端音频同步
+  - [x] 语音会话克隆与历史继承
+
 ### 🚧 计划中
 
 - [ ] 面试题库扩充 (RAG)
-- [ ] 语音交互 (Whisper STT + TTS)
 - [ ] 更多类型的专家 Agent (如薪资谈判专家)
 
 ---

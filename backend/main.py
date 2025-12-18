@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import chat, upload, sessions, config, resume
+from app.api import chat, upload, sessions, config, resume, voice_chat
 from app.models.schemas import ErrorResponse
 from app.database import db_manager
 
@@ -42,7 +42,11 @@ async def lifespan(app: FastAPI):
     os.makedirs(data_dir, exist_ok=True)
     os.makedirs(os.path.join(data_dir, "resumes"), exist_ok=True)
     
-    logger.info("数据目录初始化完成")
+    # 确保静态文件目录存在
+    static_dir = os.path.join(os.getcwd(), "static")
+    os.makedirs(os.path.join(static_dir, "audio"), exist_ok=True)
+    
+    logger.info("数据目录和静态目录初始化完成")
     
     # 建立数据库持久连接
     await db_manager.connect()
@@ -201,11 +205,20 @@ async def health_check():
 
 
 # 注册路由
+from fastapi.staticfiles import StaticFiles
+
+# 注册路由
 app.include_router(chat.router)
 app.include_router(upload.router)
 app.include_router(sessions.router)
 app.include_router(config.router)
 app.include_router(resume.router)
+app.include_router(voice_chat.router)
+
+# 挂载静态文件目录
+static_dir = os.path.join(os.getcwd(), "static")
+os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
 # 启动信息

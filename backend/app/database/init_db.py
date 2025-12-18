@@ -68,7 +68,8 @@ async def init_database():
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
                 question_index INTEGER DEFAULT 0,
-                timestamp TIMESTAMP NOT NULL
+                timestamp TIMESTAMP NOT NULL,
+                audio_url TEXT
             )
         ''')
         logger.info("✓ messages 表已创建/验证")
@@ -185,11 +186,6 @@ async def init_database():
         ''')
         
         logger.info("✓ 所有索引已创建/验证")
-        
-        # ====================================================================
-        # LangGraph Checkpoints 表 (由 PostgresSaver 自动创建)
-        # ====================================================================
-        # 注意：LangGraph 的 PostgresSaver 会自动创建 checkpoints 和 writes 表
         
         logger.info(f"✓ 数据库初始化完成: {POSTGRES_CONFIG['database']}")
         

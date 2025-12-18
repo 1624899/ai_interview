@@ -30,11 +30,13 @@ export interface ApiConfigActions {
     setContentWriterModel: (id: string) => boolean;
     setHrReviewerModel: (id: string) => boolean;
     setReflectorModel: (id: string) => boolean;
+    setVoiceModel: (id: string) => boolean;
     getGeneralModel: () => ModelConfig | null;
     getMatchAnalystModel: () => ModelConfig | null;
     getContentWriterModel: () => ModelConfig | null;
     getHrReviewerModel: () => ModelConfig | null;
     getReflectorModel: () => ModelConfig | null;
+    getVoiceModel: () => ModelConfig | null;
     // 通用方法
     isConfigured: () => boolean;
     getApiConfigForRequest: () => {
@@ -45,6 +47,7 @@ export interface ApiConfigActions {
         content_writer: { api_key: string; base_url: string; model: string };
         hr_reviewer: { api_key: string; base_url: string; model: string };
         reflector: { api_key: string; base_url: string; model: string };
+        voice: { api_key: string; base_url: string; model: string } | null;
     } | null;
 }
 
@@ -85,6 +88,7 @@ export const createApiConfigSlice = (set: SetState, get: GetState): ApiConfigSli
             newConfig.contentWriterModelId = newModel.id;
             newConfig.hrReviewerModelId = newModel.id;
             newConfig.reflectorModelId = newModel.id;
+            newConfig.voiceModelId = newModel.id;
         }
 
         set({ apiConfig: newConfig });
@@ -115,6 +119,7 @@ export const createApiConfigSlice = (set: SetState, get: GetState): ApiConfigSli
             contentWriterModelId: apiConfig.contentWriterModelId === id ? '' : apiConfig.contentWriterModelId,
             hrReviewerModelId: apiConfig.hrReviewerModelId === id ? '' : apiConfig.hrReviewerModelId,
             reflectorModelId: apiConfig.reflectorModelId === id ? '' : apiConfig.reflectorModelId,
+            voiceModelId: apiConfig.voiceModelId === id ? '' : apiConfig.voiceModelId,
         };
 
         set({ apiConfig: newConfig });
@@ -171,6 +176,13 @@ export const createApiConfigSlice = (set: SetState, get: GetState): ApiConfigSli
         return true;
     },
 
+    setVoiceModel: (id) => {
+        const { apiConfig } = get();
+        if (!apiConfig.models.find(m => m.id === id)) return false;
+        set({ apiConfig: { ...apiConfig, voiceModelId: id } });
+        return true;
+    },
+
     // Getters
     getSmartModel: () => {
         const { apiConfig } = get();
@@ -207,6 +219,11 @@ export const createApiConfigSlice = (set: SetState, get: GetState): ApiConfigSli
         return apiConfig.models.find(m => m.id === apiConfig.reflectorModelId) || null;
     },
 
+    getVoiceModel: () => {
+        const { apiConfig } = get();
+        return apiConfig.models.find(m => m.id === apiConfig.voiceModelId) || null;
+    },
+
     isConfigured: () => {
         const { apiConfig } = get();
         const smartModel = apiConfig.models.find(m => m.id === apiConfig.smartModelId);
@@ -222,6 +239,7 @@ export const createApiConfigSlice = (set: SetState, get: GetState): ApiConfigSli
         const contentWriterModel = get().getContentWriterModel();
         const hrReviewerModel = get().getHrReviewerModel();
         const reflectorModel = get().getReflectorModel();
+        const voiceModel = get().getVoiceModel();
 
         if (!smartModel || !fastModel) return null;
 
@@ -243,6 +261,7 @@ export const createApiConfigSlice = (set: SetState, get: GetState): ApiConfigSli
             content_writer: getModelConfig(contentWriterModel),
             hr_reviewer: getModelConfig(hrReviewerModel),
             reflector: getModelConfig(reflectorModel),
+            voice: voiceModel ? getModelConfig(voiceModel) : null,
         };
     },
 });

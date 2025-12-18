@@ -12,6 +12,7 @@ import {
     updateSessionTitle as updateSessionTitleApi,
     togglePinSession as togglePinSessionApi,
 } from '@/lib/api/sessions';
+import { deleteSessionAudios } from '@/lib/audioStorage';
 import type { SessionListItem, InterviewSession, Message, InterviewProgress } from '../types';
 
 // ============================================================================
@@ -25,7 +26,7 @@ export interface SessionState {
 }
 
 export interface SessionActions {
-    fetchSessions: (status?: 'active' | 'completed' | 'archived', mode?: 'coach' | 'mock') => Promise<void>;
+    fetchSessions: (status?: 'active' | 'completed' | 'archived', mode?: 'mock' | 'voice') => Promise<void>;
     selectSession: (sessionId: string) => Promise<void>;
     createNewSession: () => void;
     deleteSession: (sessionId: string) => Promise<boolean>;
@@ -82,6 +83,7 @@ export const createSessionSlice = (set: SetState, get: GetState): SessionSlice =
                 currentSession: session,
                 threadId: session.session_id,
                 messages: session.messages || [],
+                isVoiceMode: false, // 默认进入回顾模式，不自动开启实时通话
                 jobDescription: session.metadata.job_description || '',
                 interviewProgress: {
                     current: session.metadata.question_count,
@@ -103,17 +105,26 @@ export const createSessionSlice = (set: SetState, get: GetState): SessionSlice =
             currentSession: null,
             threadId: uuidv4(),
             messages: [],
+            isVoiceMode: false,
             jobDescription: '',
             companyInfo: '',
             resume: null,
             interviewProgress: null,
             maxQuestions: 5,
             showAbilityProfile: false,
+            isInitializing: false,
         });
     },
 
     deleteSession: async (sessionId: string) => {
         try {
+            // 首先尝试从前端 IndexedDB 删除音频（即使后端失败也清理本地）
+            try {
+                await deleteSessionAudios(sessionId);
+            } catch (e) {
+                console.warn('[SessionSlice] 清理本地音频失败:', e);
+            }
+
             const success = await deleteSessionApi(sessionId);
             if (!success) throw new Error('删除会话失败');
 

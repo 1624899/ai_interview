@@ -228,22 +228,28 @@ async def delete_session(
 ):
     """
     删除会话
-    
-    Args:
-        session_id: 会话ID
-        
-    Returns:
-        dict: 删除结果
     """
     try:
-        success = await session_service.delete_session(session_id, user_id=x_user_id)
-        
-        if not success:
+        # 1. 先检查是否存在
+        session = await session_service.get_session(session_id, user_id=x_user_id)
+        if not session:
             raise HTTPException(
                 status_code=404,
                 detail={
                     "error": "NotFound",
-                    "message": f"会话 {session_id} 不存在"
+                    "message": f"会话 {session_id} 不存在或无权访问"
+                }
+            )
+            
+        # 2. 执行删除
+        success = await session_service.delete_session(session_id, user_id=x_user_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "InternalServerError",
+                    "message": f"无法删除会话 {session_id}，请检查后台日志"
                 }
             )
         
@@ -260,7 +266,7 @@ async def delete_session(
             status_code=500,
             detail={
                 "error": "InternalServerError",
-                "message": "删除会话失败"
+                "message": f"删除会话过程出现异常: {str(e)}"
             }
         )
 

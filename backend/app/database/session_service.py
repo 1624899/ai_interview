@@ -1,48 +1,38 @@
 """
-会话管理服务 - PostgreSQL 版本
-负责面试会话的持久化存储和管理
+会话管理服务 - 门面模式 (Facade)
+通过组合多个子服务来实现完整的会话管理逻辑
 """
 
-import json
 import logging
-import uuid
 from typing import List, Optional, Dict, Any
-from datetime import datetime
 
 from app.models.session import (
     InterviewSession, 
-    SessionListItem, 
-    SessionMetadata,
-    MessageItem
+    SessionListItem
 )
-from app.database.base import db_manager
+from .session_services.session_mgmt import SessionManagementService
+from .session_services.session_advanced import SessionAdvancedService
+from .session_services.message_mgmt import MessageService
+from .session_services.profile_mgmt import ProfileService
+from .session_services.interview_plan import InterviewPlanService
 
 logger = logging.getLogger(__name__)
 
-
 class SessionService:
-    """会话管理服务类 - 使用 PostgreSQL 数据库"""
+    """
+    会话管理门面类
+    将请求转发到具体的子服务处理
+    """
     
     def __init__(self):
-        """初始化会话服务"""
-        logger.info("SessionService 初始化 (PostgreSQL)")
-    
-    async def _check_session_access(
-        self, 
-        conn, 
-        session_id: str, 
-        user_id: Optional[str] = None
-    ) -> bool:
-        """检查用户是否有权访问指定会话"""
-        sql = 'SELECT 1 FROM sessions WHERE session_id = $1'
-        params = [session_id]
-        
-        if user_id:
-            sql += ' AND user_id = $2'
-            params.append(user_id)
-            
-        result = await conn.fetchrow(sql, *params)
-        return result is not None
+        self.mgmt = SessionManagementService()
+        self.advanced = SessionAdvancedService(self.mgmt)
+        self.message = MessageService(self.mgmt)
+        self.profile = ProfileService()
+        self.plan = InterviewPlanService()
+        logger.info("SessionService (Facade) 初始化完成")
+
+    # --- 会话基础管理 (SessionManagementService) ---
     
     async def create_session(
         self,
@@ -56,212 +46,21 @@ class SessionService:
         max_questions: int = 5,
         user_id: str = "default_user"
     ) -> InterviewSession:
-        """创建新会话"""
-        # 生成默认标题
-        if title is None:
-            mode_text = "辅导模式" if mode == "coach" else "模拟面试"
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-            title = f"{mode_text} - {timestamp}"
-        
-        now = datetime.now()
-        
-        async with db_manager.get_connection() as conn:
-            try:
-                await conn.execute('''
-                    INSERT INTO sessions (
-                        session_id, user_id, title, created_at, updated_at, mode,
-                        resume_filename, resume_content, job_description, company_info,
-                        question_count, max_questions, status, pinned
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-                ''', session_id, user_id, title, now, now, mode,
-                    resume_filename, resume_content, job_description, company_info,
-                    0, max_questions, 'active', False
-                )
-                
-                logger.info(f"创建新会话: {session_id}")
-                return await self.get_session(session_id)
-                
-            except Exception as e:
-                if 'duplicate key' in str(e).lower():
-                    logger.error(f"会话已存在: {session_id}")
-                    raise ValueError(f"会话 {session_id} 已存在")
-                raise
-    
-    async def create_next_round(
-        self,
-        parent_session_id: str,
-        max_questions: int = 5,
-        user_id: Optional[str] = None
-    ) -> InterviewSession:
-        """
-        从已完成的面试创建下一轮面试
-        
-        Args:
-            parent_session_id: 上一轮会话ID
-            max_questions: 最大问题数量
-            user_id: 用户ID
-            
-        Returns:
-            新创建的下一轮会话
-            
-        Raises:
-            ValueError: 如果上一轮未完成或不存在
-        """
-        # 获取parent session，包含简历内容
-        parent = await self.get_session(parent_session_id, include_resume_content=True, user_id=user_id)
-        
-        if not parent:
-            raise ValueError(f"父会话不存在: {parent_session_id}")
-        
-        if parent.metadata.status != "completed":
-            raise ValueError(f"只能从已完成的面试创建下一轮（当前状态: {parent.metadata.status}）")
-        
-        # 计算新轮次
-        new_round_index = parent.metadata.round_index + 1
-        
-        # 自动推断面试类型
-        round_type_map = {
-            1: "tech_initial",
-            2: "tech_deep",
-            3: "hr_comprehensive"
-        }
-        new_round_type = round_type_map.get(new_round_index, "hr_comprehensive")
-        
-        # 确定series_id（如果parent没有，则生成新的）
-        series_id = parent.metadata.series_id
-        if not series_id:
-            series_id = str(uuid.uuid4())
-            # 更新parent session的series_id
-            async with db_manager.get_connection() as conn:
-                await conn.execute(
-                    'UPDATE sessions SET series_id = $1 WHERE session_id = $2',
-                    series_id, parent_session_id
-                )
-        
-        # 生成新session_id
-        new_session_id = str(uuid.uuid4())
-        
-        # 生成标题：{JD摘要} - 第N轮
-        jd = parent.metadata.job_description or ""
-        jd_summary = jd[:15] + "..." if len(jd) > 15 else jd
-        title = f"{jd_summary} - 第{new_round_index}轮"
-        
-        # 创建新会话
-        now = datetime.now()
-        async with db_manager.get_connection() as conn:
-            await conn.execute('''
-                INSERT INTO sessions (
-                    session_id, user_id, title, created_at, updated_at, mode,
-                    resume_filename, resume_content, job_description, company_info,
-                    question_count, max_questions, status, pinned,
-                    series_id, round_index, round_type, parent_session_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-            ''',
-                new_session_id,
-                user_id or "default_user",
-                title,
-                now, now,
-                parent.metadata.mode,
-                parent.metadata.resume_filename,
-                parent.metadata.resume_content,
-                parent.metadata.job_description,
-                parent.metadata.company_info,
-                0,  # question_count
-                max_questions,
-                'active',
-                False,  # pinned
-                series_id,
-                new_round_index,
-                new_round_type,
-                parent_session_id
-            )
-        
-        logger.info(f"创建下一轮面试: {new_session_id} (第{new_round_index}轮, 类型: {new_round_type})")
-        return await self.get_session(new_session_id)
-    
-    async def get_session(
-        self, 
-        session_id: str, 
-        include_resume_content: bool = False, 
-        user_id: Optional[str] = None
-    ) -> Optional[InterviewSession]:
-        """获取会话详情"""
-        async with db_manager.get_connection() as conn:
-            # 构建查询
-            columns = [
-                "session_id", "title", "created_at", "updated_at", "mode",
-                "resume_filename", "job_description", "company_info",
-                "question_count", "max_questions", "status", "pinned",
-                "series_id", "round_index", "round_type", "parent_session_id"
-            ]
-            if include_resume_content:
-                columns.append("resume_content")
-            
-            select_clause = ", ".join(columns)
-            sql = f'SELECT {select_clause} FROM sessions WHERE session_id = $1'
-            params = [session_id]
-            
-            if user_id:
-                sql += ' AND user_id = $2'
-                params.append(user_id)
-                
-            row = await conn.fetchrow(sql, *params)
-            if row is None:
-                return None
-            
-            # 获取消息列表
-            messages_rows = await conn.fetch('''
-                SELECT role, content, timestamp, question_index
-                FROM messages 
-                WHERE session_id = $1 
-                ORDER BY timestamp ASC
-            ''', session_id)
-            
-            messages = [
-                MessageItem(
-                    role=msg['role'],
-                    content=msg['content'],
-                    timestamp=msg['timestamp'].isoformat() if isinstance(msg['timestamp'], datetime) else msg['timestamp'],
-                    question_index=msg['question_index'] or 0
-                )
-                for msg in messages_rows
-            ]
-            
-            # 构建会话对象
-            resume_content = None
-            if include_resume_content and 'resume_content' in row.keys():
-                resume_content = row['resume_content']
+        return await self.mgmt.create_session(
+            session_id=session_id,
+            mode=mode,
+            title=title,
+            resume_filename=resume_filename,
+            resume_content=resume_content,
+            job_description=job_description,
+            company_info=company_info,
+            max_questions=max_questions,
+            user_id=user_id
+        )
 
-            metadata = SessionMetadata(
-                mode=row['mode'],
-                resume_filename=row['resume_filename'],
-                resume_content=resume_content,
-                job_description=row['job_description'],
-                company_info=row['company_info'] if row['company_info'] else None,
-                question_count=row['question_count'],
-                max_questions=row['max_questions'],
-                status=row['status'],
-                pinned=bool(row['pinned']),
-                series_id=row['series_id'],
-                round_index=row['round_index'] or 1,
-                round_type=row['round_type'] or 'tech_initial',
-                parent_session_id=row['parent_session_id']
-            )
-            
-            created_at = row['created_at']
-            updated_at = row['updated_at']
-            
-            session = InterviewSession(
-                session_id=row['session_id'],
-                title=row['title'],
-                created_at=created_at.isoformat() if isinstance(created_at, datetime) else created_at,
-                updated_at=updated_at.isoformat() if isinstance(updated_at, datetime) else updated_at,
-                metadata=metadata,
-                messages=messages
-            )
-            
-            return session
-    
+    async def get_session(self, session_id: str, include_resume_content: bool = False, user_id: Optional[str] = None) -> Optional[InterviewSession]:
+        return await self.mgmt.get_session(session_id, include_resume_content, user_id)
+
     async def update_session(
         self,
         session_id: str,
@@ -270,76 +69,14 @@ class SessionService:
         metadata_updates: Optional[Dict[str, Any]] = None,
         user_id: Optional[str] = None
     ) -> Optional[InterviewSession]:
-        """更新会话信息"""
-        async with db_manager.get_connection() as conn:
-            # 检查会话是否存在
-            if not await self._check_session_access(conn, session_id, user_id):
-                return None
-            
-            # 构建更新语句
-            updates = []
-            params = []
-            param_idx = 1
-            
-            if title is not None:
-                updates.append(f'title = ${param_idx}')
-                params.append(title)
-                param_idx += 1
-            
-            if status is not None:
-                updates.append(f'status = ${param_idx}')
-                params.append(status)
-                param_idx += 1
-            
-            if metadata_updates:
-                for key, value in metadata_updates.items():
-                    if key in ['question_count', 'max_questions', 'resume_filename', 'job_description', 'pinned']:
-                        updates.append(f'{key} = ${param_idx}')
-                        params.append(bool(value) if key == 'pinned' else value)
-                        param_idx += 1
-            
-            # 更新 updated_at
-            updates.append(f'updated_at = ${param_idx}')
-            params.append(datetime.now())
-            param_idx += 1
-            
-            params.append(session_id)
-            
-            if updates:
-                sql = f"UPDATE sessions SET {', '.join(updates)} WHERE session_id = ${param_idx}"
-                await conn.execute(sql, *params)
-                logger.info(f"更新会话: {session_id}")
-            
-            return await self.get_session(session_id)
-    
-    async def add_message(
-        self,
-        session_id: str,
-        role: str,
-        content: str,
-        question_index: int = 0,
-        user_id: Optional[str] = None
-    ) -> Optional[InterviewSession]:
-        """向会话添加消息"""
-        async with db_manager.get_connection() as conn:
-            # 检查会话是否存在
-            if not await self._check_session_access(conn, session_id, user_id):
-                return None
-            
-            timestamp = datetime.now()
-            
-            await conn.execute('''
-                INSERT INTO messages (session_id, role, content, timestamp, question_index)
-                VALUES ($1, $2, $3, $4, $5)
-            ''', session_id, role, content, timestamp, question_index)
-            
-            # 更新会话的 updated_at
-            await conn.execute('''
-                UPDATE sessions SET updated_at = $1 WHERE session_id = $2
-            ''', timestamp, session_id)
-            
-            return await self.get_session(session_id)
-    
+        return await self.mgmt.update_session(
+            session_id=session_id,
+            title=title,
+            status=status,
+            metadata_updates=metadata_updates,
+            user_id=user_id
+        )
+
     async def list_sessions(
         self,
         status: Optional[str] = None,
@@ -348,456 +85,105 @@ class SessionService:
         offset: int = 0,
         user_id: Optional[str] = None
     ) -> List[SessionListItem]:
-        """获取会话列表"""
-        async with db_manager.get_connection() as conn:
-            sql = '''
-                SELECT 
-                    s.session_id, s.title, s.created_at, s.updated_at, s.mode, s.status,
-                    s.question_count, s.pinned, s.round_index, s.round_type,
-                    (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.session_id) as message_count
-                FROM sessions s
-                WHERE 1=1
-            '''
-            params = []
-            param_idx = 1
-            
-            if status:
-                sql += f' AND s.status = ${param_idx}'
-                params.append(status)
-                param_idx += 1
-            
-            if mode:
-                sql += f' AND s.mode = ${param_idx}'
-                params.append(mode)
-                param_idx += 1
-            
-            if user_id:
-                sql += f' AND s.user_id = ${param_idx}'
-                params.append(user_id)
-                param_idx += 1
-            
-            sql += f' ORDER BY s.pinned DESC, s.updated_at DESC LIMIT ${param_idx} OFFSET ${param_idx + 1}'
-            params.extend([limit, offset])
-            
-            rows = await conn.fetch(sql, *params)
-            
-            sessions = []
-            for row in rows:
-                created_at = row['created_at']
-                updated_at = row['updated_at']
-                
-                sessions.append(SessionListItem(
-                    session_id=row['session_id'],
-                    title=row['title'],
-                    created_at=created_at.isoformat() if isinstance(created_at, datetime) else created_at,
-                    updated_at=updated_at.isoformat() if isinstance(updated_at, datetime) else updated_at,
-                    mode=row['mode'],
-                    status=row['status'],
-                    message_count=row['message_count'],
-                    question_count=row['question_count'],
-                    pinned=bool(row['pinned']),
-                    round_index=row['round_index'] or 1,
-                    round_type=row['round_type'] or 'tech_initial'
-                ))
-            
-            return sessions
-    
+        return await self.mgmt.list_sessions(
+            status=status,
+            mode=mode,
+            limit=limit,
+            offset=offset,
+            user_id=user_id
+        )
+
     async def delete_session(self, session_id: str, user_id: Optional[str] = None) -> bool:
-        """删除会话"""
-        async with db_manager.get_connection() as conn:
-            # 检查会话是否存在
-            if not await self._check_session_access(conn, session_id, user_id):
-                return False
-            
-            try:
-                # 删除消息（外键级联会自动删除，但显式删除更清晰）
-                await conn.execute('DELETE FROM messages WHERE session_id = $1', session_id)
-                
-                # 删除会话
-                await conn.execute('DELETE FROM sessions WHERE session_id = $1', session_id)
-                
-                # 删除 LangGraph checkpoints
-                try:
-                    await conn.execute('DELETE FROM checkpoints WHERE thread_id = $1', session_id)
-                    await conn.execute('DELETE FROM writes WHERE thread_id = $1', session_id)
-                except:
-                    pass  # 表可能不存在
-                
-                logger.info(f"✓ 成功删除会话及所有关联数据: {session_id}")
-                return True
-                
-            except Exception as e:
-                logger.error(f"✗ 删除会话失败: {session_id}, 错误: {e}")
-                return False
-    
+        return await self.mgmt.delete_session(session_id, user_id)
+
     async def get_session_count(self, status: Optional[str] = None, user_id: Optional[str] = None) -> int:
-        """获取会话总数"""
-        async with db_manager.get_connection() as conn:
-            sql = 'SELECT COUNT(*) FROM sessions WHERE 1=1'
-            params = []
-            param_idx = 1
-            
-            if status:
-                sql += f' AND status = ${param_idx}'
-                params.append(status)
-                param_idx += 1
-                
-            if user_id:
-                sql += f' AND user_id = ${param_idx}'
-                params.append(user_id)
-                
-            return await conn.fetchval(sql, *params)
+        return await self.mgmt.get_session_count(status, user_id)
+
+    # --- 会话高级操作 (SessionAdvancedService) ---
+
+    async def create_next_round(
+        self,
+        parent_session_id: str,
+        max_questions: int = 5,
+        user_id: Optional[str] = None
+    ) -> InterviewSession:
+        return await self.advanced.create_next_round(
+            parent_session_id=parent_session_id,
+            max_questions=max_questions,
+            user_id=user_id
+        )
+
+    async def clone_session_for_voice(
+        self,
+        source_session_id: str,
+        user_id: Optional[str] = None,
+        max_questions: Optional[int] = None
+    ) -> InterviewSession:
+        return await self.advanced.clone_session_for_voice(
+            source_session_id=source_session_id,
+            user_id=user_id,
+            max_questions=max_questions
+        )
 
     async def rollback_session(self, session_id: str, index: int, user_id: Optional[str] = None) -> bool:
-        """回退会话到指定索引"""
-        async with db_manager.get_connection() as conn:
-            try:
-                # 权限校验
-                if not await self._check_session_access(conn, session_id, user_id):
-                    logger.warning(f"回退失败：会话 {session_id} 不存在或无权访问")
-                    return False
-                
-                if index == 0:
-                    # 完全重置
-                    await conn.execute('DELETE FROM messages WHERE session_id = $1', session_id)
-                    await conn.execute('''
-                        UPDATE sessions SET question_count = 0, updated_at = $1 WHERE session_id = $2
-                    ''', datetime.now(), session_id)
-                    logger.info(f"会话 {session_id} 消息已清空，进度已重置")
-                else:
-                    # 部分回退 - 获取目标消息的时间戳
-                    target_row = await conn.fetchrow('''
-                        SELECT timestamp FROM messages 
-                        WHERE session_id = $1 
-                        ORDER BY timestamp ASC 
-                        LIMIT 1 OFFSET $2
-                    ''', session_id, index)
-                    
-                    if not target_row:
-                        logger.warning(f"回退失败：找不到索引 {index} 的消息")
-                        return False
-                    
-                    target_timestamp = target_row['timestamp']
-                    
-                    # 删除该时间戳及之后的消息
-                    await conn.execute('''
-                        DELETE FROM messages 
-                        WHERE session_id = $1 AND timestamp >= $2
-                    ''', session_id, target_timestamp)
-                    
-                    await conn.execute('''
-                        UPDATE sessions SET updated_at = $1 WHERE session_id = $2
-                    ''', datetime.now(), session_id)
-                    
-                    # 重新计算 question_count
-                    new_count = await conn.fetchval('''
-                        SELECT COUNT(*) FROM messages WHERE session_id = $1 AND role = 'user'
-                    ''', session_id)
-                    
-                    await conn.execute('''
-                        UPDATE sessions SET question_count = $1 WHERE session_id = $2
-                    ''', new_count, session_id)
-                    logger.info(f"会话 {session_id} 进度已重置为: {new_count}")
-                
-                # 清除 LangGraph Checkpoints
-                try:
-                    await conn.execute('DELETE FROM checkpoints WHERE thread_id = $1', session_id)
-                    await conn.execute('DELETE FROM writes WHERE thread_id = $1', session_id)
-                    logger.info(f"会话 {session_id} 的 LangGraph Checkpoints 已清除")
-                except:
-                    pass
-                
-                return True
-                
-            except Exception as e:
-                logger.error(f"回退会话失败: {e}")
-                return False
+        return await self.advanced.rollback_session(session_id, index, user_id)
 
-    async def save_profile(self, session_id: str, profile_data: Dict[str, Any]) -> bool:
-        """保存候选人画像到会话"""
-        async with db_manager.get_connection() as conn:
-            try:
-                await conn.execute('''
-                    UPDATE sessions SET candidate_profile = $1, updated_at = $2 WHERE session_id = $3
-                ''', json.dumps(profile_data, ensure_ascii=False), datetime.now(), session_id)
-                logger.info(f"保存单场面试画像: {session_id}")
-                return True
-            except Exception as e:
-                logger.error(f"保存画像失败: {e}")
-                return False
+    # --- 消息管理 (MessageService) ---
 
-    async def get_profile(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """获取单个会话的候选人画像"""
-        async with db_manager.get_connection() as conn:
-            row = await conn.fetchrow('''
-                SELECT candidate_profile FROM sessions WHERE session_id = $1
-            ''', session_id)
-            
-            if row and row['candidate_profile']:
-                profile = row['candidate_profile']
-                if isinstance(profile, str):
-                    return json.loads(profile)
-                return profile
-            return None
-
-    async def get_interview_plan(self, session_id: str) -> Optional[List[Dict[str, Any]]]:
-        """获取面试题目清单"""
-        async with db_manager.get_connection() as conn:
-            row = await conn.fetchrow('''
-                SELECT interview_plan FROM sessions WHERE session_id = $1
-            ''', session_id)
-            
-            if row and row['interview_plan']:
-                plan = row['interview_plan']
-                # PostgreSQL JSONB 自动解析
-                if isinstance(plan, str):
-                    return json.loads(plan)
-                return plan
-            return None
-
-    async def save_interview_plan(self, session_id: str, plan: List[Dict[str, Any]]) -> bool:
-        """保存面试题目清单"""
-        async with db_manager.get_connection() as conn:
-            try:
-                await conn.execute('''
-                    UPDATE sessions SET interview_plan = $1, updated_at = $2 WHERE session_id = $3
-                ''', json.dumps(plan, ensure_ascii=False), datetime.now(), session_id)
-                logger.info(f"保存面试计划: {session_id}, 共 {len(plan)} 道题")
-                return True
-            except Exception as e:
-                logger.error(f"保存面试计划失败: {e}")
-                return False
-
-    async def get_recent_profiles(self, limit: int = 5, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """获取最近的有画像的会话画像列表"""
-        async with db_manager.get_connection() as conn:
-            sql = '''
-                SELECT candidate_profile 
-                FROM sessions 
-                WHERE candidate_profile IS NOT NULL 
-            '''
-            params = []
-            param_idx = 1
-            
-            if user_id:
-                sql += f' AND user_id = ${param_idx}'
-                params.append(user_id)
-                param_idx += 1
-                
-            sql += f' ORDER BY updated_at DESC LIMIT ${param_idx}'
-            params.append(limit)
-            
-            rows = await conn.fetch(sql, *params)
-            
-            profiles = []
-            for row in rows:
-                if row['candidate_profile']:
-                    profile = row['candidate_profile']
-                    if isinstance(profile, str):
-                        profiles.append(json.loads(profile))
-                    else:
-                        profiles.append(profile)
-            return profiles
-
-    async def get_series_final_profiles(self, limit: int = 5, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        获取每条面试路径的终点画像（用于综合能力聚合）
-        
-        逻辑：
-        1. 找到"叶子节点"：没有其他会话以它为 parent_session_id 的会话
-        2. 每个叶子节点代表一条独立路径的终点
-        3. 按更新时间倒序，取最近 limit 个
-        
-        示例：
-        A(第1轮) → B(第2轮) → C(第3轮)  ← C 是叶子
-        A(第1轮) → D(第2轮)              ← D 是叶子
-        结果：取 C 和 D 的画像
-        
-        Args:
-            limit: 最多返回多少个画像
-            user_id: 用户ID过滤
-            
-        Returns:
-            List[Dict]: 画像列表
-        """
-        async with db_manager.get_connection() as conn:
-            params = []
-            param_idx = 1
-            
-            # 基础查询：找叶子节点（没有子节点指向它的会话）
-            sql = '''
-                SELECT s.candidate_profile, s.updated_at
-                FROM sessions s
-                WHERE s.candidate_profile IS NOT NULL
-                  AND NOT EXISTS (
-                      SELECT 1 FROM sessions child 
-                      WHERE child.parent_session_id = s.session_id
-                  )
-            '''
-            
-            if user_id:
-                sql += f' AND s.user_id = ${param_idx}'
-                params.append(user_id)
-                param_idx += 1
-            
-            sql += f' ORDER BY s.updated_at DESC LIMIT ${param_idx}'
-            params.append(limit)
-            
-            rows = await conn.fetch(sql, *params)
-            
-            profiles = []
-            for row in rows:
-                if row['candidate_profile']:
-                    profile = row['candidate_profile']
-                    if isinstance(profile, str):
-                        profiles.append(json.loads(profile))
-                    else:
-                        profiles.append(profile)
-            
-            logger.info(f"获取到 {len(profiles)} 个路径终点的画像（叶子节点）")
-            return profiles
-
-    async def save_user_profile(self, profile_data: Dict[str, Any], user_id: str = "default_user") -> bool:
-        """保存用户综合能力画像"""
-        async with db_manager.get_connection() as conn:
-            try:
-                now = datetime.now()
-                profile_json = json.dumps(profile_data, ensure_ascii=False)
-                
-                # UPSERT
-                await conn.execute('''
-                    INSERT INTO user_profile (user_id, profile_data, created_at, updated_at)
-                    VALUES ($1, $2, $3, $4)
-                    ON CONFLICT (user_id) 
-                    DO UPDATE SET profile_data = $2, updated_at = $4
-                ''', user_id, profile_json, now, now)
-                
-                logger.info(f"保存用户综合能力画像: {user_id}")
-                return True
-                
-            except Exception as e:
-                logger.error(f"保存用户综合能力画像失败: {e}")
-                return False
-
-    async def get_user_profile(self, user_id: str = "default_user") -> Optional[Dict[str, Any]]:
-        """获取用户综合能力画像"""
-        async with db_manager.get_connection() as conn:
-            row = await conn.fetchrow('''
-                SELECT profile_data, updated_at 
-                FROM user_profile 
-                WHERE user_id = $1
-            ''', user_id)
-            
-            if row and row['profile_data']:
-                profile = row['profile_data']
-                updated_at = row['updated_at']
-                
-                return {
-                    "profile": json.loads(profile) if isinstance(profile, str) else profile,
-                    "updated_at": updated_at.isoformat() if isinstance(updated_at, datetime) else updated_at
-                }
-            return None
-
-    async def get_session_conversations(
+    async def add_message(
         self,
         session_id: str,
+        role: str,
+        content: str,
+        question_index: int = 0,
+        audio_url: Optional[str] = None,
         user_id: Optional[str] = None
-    ) -> List[Dict[str, str]]:
-        """
-        获取会话的完整对话内容（用于简历优化参考）
-        
-        Args:
-            session_id: 会话ID
-            user_id: 用户ID（用于权限校验）
-            
-        Returns:
-            QA 对列表，格式为 [{"question": "...", "answer": "..."}, ...]
-        """
-        async with db_manager.get_connection() as conn:
-            # 权限校验
-            if not await self._check_session_access(conn, session_id, user_id):
-                return []
-            
-            # 获取所有消息
-            rows = await conn.fetch('''
-                SELECT role, content
-                FROM messages
-                WHERE session_id = $1
-                ORDER BY timestamp ASC
-            ''', session_id)
-            
-            # 解析 QA 对
-            qa_pairs = []
-            for i in range(len(rows) - 1):
-                msg = rows[i]
-                next_msg = rows[i + 1]
-                
-                # 寻找 "AI提问 -> User回答" 的模式
-                if msg['role'] == 'ai' and next_msg['role'] == 'user':
-                    question = msg['content'].strip()
-                    answer = next_msg['content'].strip()
-                    
-                    if question and answer:
-                        qa_pairs.append({
-                            "question": question,
-                            "answer": answer
-                        })
-            
-            logger.info(f"获取会话 {session_id} 的对话内容，共 {len(qa_pairs)} 个 QA 对")
-            return qa_pairs
+    ) -> Optional[InterviewSession]:
+        return await self.message.add_message(
+            session_id=session_id,
+            role=role,
+            content=content,
+            question_index=question_index,
+            audio_url=audio_url,
+            user_id=user_id
+        )
 
-    async def get_completed_sessions_for_resume(
-        self,
-        user_id: Optional[str] = None,
-        limit: int = 10
-    ) -> List[Dict[str, Any]]:
-        """
-        获取可用于简历优化的已完成会话列表
-        
-        Args:
-            user_id: 用户ID
-            limit: 最大返回数量
-            
-        Returns:
-            已完成会话列表
-        """
-        async with db_manager.get_connection() as conn:
-            sql = '''
-                SELECT 
-                    s.session_id, s.title, s.updated_at, s.round_index, s.round_type,
-                    (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.session_id) as message_count
-                FROM sessions s
-                WHERE s.status = 'completed'
-            '''
-            params = []
-            param_idx = 1
-            
-            if user_id:
-                sql += f' AND s.user_id = ${param_idx}'
-                params.append(user_id)
-                param_idx += 1
-            
-            sql += f' ORDER BY s.updated_at DESC LIMIT ${param_idx}'
-            params.append(limit)
-            
-            rows = await conn.fetch(sql, *params)
-            
-            sessions = []
-            for row in rows:
-                updated_at = row['updated_at']
-                sessions.append({
-                    'session_id': row['session_id'],
-                    'title': row['title'],
-                    'updated_at': updated_at.isoformat() if isinstance(updated_at, datetime) else updated_at,
-                    'round_index': row['round_index'] or 1,
-                    'round_type': row['round_type'] or 'tech_initial',
-                    'message_count': row['message_count']
-                })
-            
-            logger.info(f"获取已完成会话列表，共 {len(sessions)} 个")
-            return sessions
+    async def get_session_conversations(self, session_id: str, user_id: Optional[str] = None) -> List[Dict[str, str]]:
+        return await self.message.get_session_conversations(session_id, user_id)
 
+    # --- 画像管理 (ProfileService) ---
+
+    async def save_profile(self, session_id: str, profile_data: Dict[str, Any]) -> bool:
+        return await self.profile.save_profile(session_id, profile_data)
+
+    async def get_profile(self, session_id: str) -> Optional[Dict[str, Any]]:
+        return await self.profile.get_profile(session_id)
+
+    async def get_recent_profiles(self, limit: int = 5, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        return await self.profile.get_recent_profiles(limit, user_id)
+
+    async def get_series_final_profiles(self, limit: int = 5, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        return await self.profile.get_series_final_profiles(limit, user_id)
+
+    async def save_user_profile(self, profile_data: Dict[str, Any], user_id: str = "default_user") -> bool:
+        return await self.profile.save_user_profile(profile_data, user_id)
+
+    async def get_user_profile(self, user_id: str = "default_user") -> Optional[Dict[str, Any]]:
+        return await self.profile.get_user_profile(user_id)
+
+    # --- 面试计划与进度 (InterviewPlanService) ---
+
+    async def get_interview_plan(self, session_id: str) -> Optional[List[Dict[str, Any]]]:
+        return await self.plan.get_interview_plan(session_id)
+
+    async def save_interview_plan(self, session_id: str, plan: List[Dict[str, Any]]) -> bool:
+        return await self.plan.save_interview_plan(session_id, plan)
+
+    async def update_session_question_count(self, session_id: str, count: int) -> bool:
+        return await self.plan.update_session_question_count(session_id, count)
+
+    async def get_completed_sessions_for_resume(self, user_id: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
+        return await self.plan.get_completed_sessions_for_resume(user_id, limit)
 
 # 创建全局实例
 session_service = SessionService()
-

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/atom-one-dark.css';
@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // 聊天消息组件属性接口
 interface ChatMessageProps {
-    role: 'user' | 'ai' | 'system'; // 消息角色：用户、AI或系统
+    role: 'user' | 'assistant' | 'system'; // 消息角色：用户、AI或系统
     content: string; // 消息内容
     timestamp?: string; // 消息时间戳
     isStreaming?: boolean; // 是否正在流式传输
@@ -18,7 +18,7 @@ interface ChatMessageProps {
 
 import { motion } from "framer-motion";
 
-import { User, Bot, Copy, Pencil, Check, X, RefreshCw } from 'lucide-react';
+import { User, Bot, Copy, Pencil, Check, X, RefreshCw, Volume2, Mic } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 
@@ -115,7 +115,7 @@ export function ChatMessage({ role, content, timestamp, isStreaming, onEdit, onC
                                 : "bg-transparent text-gray-900 px-0 py-0 text-base" // AI：无背景，字号加大 (text-base = 16px)
                         )}>
                             {/* 渲染Markdown内容 */}
-                            {role === 'ai' ? (
+                            {role === 'assistant' ? (
                                 <div className="prose prose-base dark:prose-invert break-words max-w-none text-base leading-7">
                                     <ReactMarkdown
                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -154,10 +154,16 @@ export function ChatMessage({ role, content, timestamp, isStreaming, onEdit, onC
                                     </ReactMarkdown>
                                 </div>
                             ) : (
-                                <p className="whitespace-pre-wrap">{content}</p>
+                                content === '[语音]' ? (
+                                    <div className="flex items-center gap-2 italic text-teal-700/60 font-normal">
+                                        <Mic className="h-4 w-4" />
+                                        <span>语音消息</span>
+                                    </div>
+                                ) : (
+                                    <p className="whitespace-pre-wrap">{content}</p>
+                                )
                             )}
 
-                            {/* 光标动画：仅在流式传输时显示 */}
                             {isStreaming && (
                                 <span className="inline-block w-1.5 h-4 ml-1 bg-current animate-pulse align-middle" />
                             )}
@@ -188,7 +194,7 @@ export function ChatMessage({ role, content, timestamp, isStreaming, onEdit, onC
                         )}
 
                         {/* AI消息操作按钮 (悬停显示) */}
-                        {role === 'ai' && !isStreaming && (
+                        {role === 'assistant' && !isStreaming && (
                             <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 px-1">
                                 <Button
                                     variant="ghost"
@@ -215,6 +221,6 @@ export function ChatMessage({ role, content, timestamp, isStreaming, onEdit, onC
                     </>
                 )}
             </div>
-        </motion.div>
+        </motion.div >
     );
 }

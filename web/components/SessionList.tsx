@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import { Trash2, MoreHorizontal, GraduationCap, Timer, Edit2, Pin, PinOff } from 'lucide-react';
+import { Trash2, MoreHorizontal, GraduationCap, Timer, Edit2, Pin, PinOff, Mic } from 'lucide-react';
 import { SessionListItem } from '@/store/useInterviewStore';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -198,6 +198,9 @@ function SessionItem({ session, isActive, onSelect, onDelete, onEdit, onTogglePi
                     <div className="truncate leading-none font-medium flex-1" title={displayTitle}>
                         {displayTitle}
                     </div>
+                    {session.mode === 'voice' && (
+                        <Mic className="w-3 h-3 text-purple-500 flex-shrink-0" />
+                    )}
                     {session.round_index && session.round_index > 1 && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-100 text-teal-700 flex-shrink-0">
                             第{session.round_index}轮

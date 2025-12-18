@@ -10,7 +10,7 @@ import { apiRequest, API_BASE_URL, getUserId } from './config';
 // ============================================================================
 
 export interface SessionMetadata {
-    mode: 'coach' | 'mock';
+    mode: 'mock' | 'voice';
     resume_filename?: string;
     job_description?: string;
     question_count: number;
@@ -21,7 +21,7 @@ export interface SessionMetadata {
 }
 
 export interface Message {
-    role: 'user' | 'ai' | 'system';
+    role: 'user' | "assistant" | 'system';
     content: string;
     timestamp: string;
 }
@@ -40,7 +40,7 @@ export interface SessionListItem {
     title: string;
     created_at: string;
     updated_at: string;
-    mode: 'coach' | 'mock';
+    mode: 'mock' | 'voice';
     status: 'active' | 'completed' | 'archived';
     message_count: number;
     question_count: number;
@@ -58,7 +58,7 @@ export interface SessionListItem {
  */
 export async function fetchSessionList(
     status?: 'active' | 'completed' | 'archived',
-    mode?: 'coach' | 'mock',
+    mode?: 'mock' | 'voice',
     limit: number = 50
 ): Promise<SessionListItem[]> {
     try {

@@ -6,6 +6,7 @@
  * - 聊天状态 (messages, streaming)
  * - 面试上下文 (resume, jobDescription, progress)
  * - API 配置 (apiConfig)
+ * - 语音模式状态 (isVoiceMode)
  */
 
 import { create } from 'zustand';

@@ -134,7 +134,10 @@ async def start_interview(
             "current_question_index": 0,
             "max_questions": request.max_questions,
             "question_count": 0,
-            "api_config": api_config  # 添加用户 API 配置
+            "question_count": 0,
+            "api_config": api_config,  # 添加用户 API 配置
+            "round_index": 1,
+            "round_type": "tech_initial"
         }
         
         # 检查会话是否已存在，如果不存在则创建
@@ -159,11 +162,16 @@ async def start_interview(
                 inputs["job_description"] = session.metadata.job_description
             if session.metadata.company_info:
                 inputs["company_info"] = session.metadata.company_info
+            
+            # 重要：从元数据中继承轮次信息
+            inputs["round_index"] = session.metadata.round_index or 1
+            inputs["round_type"] = session.metadata.round_type or "tech_initial"
         
-        # 生成并更新会话标题：{JD摘要} - 第1轮
+        # 生成并更新会话标题：{JD摘要} - 第 X 轮
+        current_r_idx = inputs["round_index"]
         jd_for_title = inputs["job_description"] or request.job_description or ""
         summary = jd_for_title[:15] + "..." if len(jd_for_title) > 15 else jd_for_title
-        title = f"{summary} - 第1轮"
+        title = f"{summary} - 第{current_r_idx}轮"
         
         # 更新数据库中的会话标题
         await session_service.update_session(request.thread_id, title=title)
@@ -185,7 +193,7 @@ async def start_interview(
         if first_question:
             await session_service.add_message(
                 session_id=request.thread_id,
-                role="ai",
+                role="assistant",
                 content=first_question,
                 question_index=0
             )
@@ -311,7 +319,11 @@ async def stream_chat(request: ChatRequest):
             "turn_phase": "feedback",
             
             # 添加用户 API 配置
-            "api_config": api_config
+            "api_config": api_config,
+            
+            # 分配轮次信息
+            "round_index": session.metadata.round_index if session else 1,
+            "round_type": session.metadata.round_type if session else "tech_initial"
         }
         
         return StreamingResponse(
@@ -413,7 +425,7 @@ async def event_generator(graph, inputs, config, thread_id: str, user_message: s
         if ai_response_content:
             await session_service.add_message(
                 session_id=thread_id,
-                role="ai",
+                role="assistant",
                 content=ai_response_content,
                 question_index=final_question_index
             )

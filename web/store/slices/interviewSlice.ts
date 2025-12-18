@@ -25,7 +25,13 @@ export interface InterviewFlowState {
     maxQuestions: number;
     showAbilityProfile: boolean;
     apiError: string | null;
+    isVoiceMode: boolean;
     _abortController: AbortController | null;
+    // 语音面试相关状态
+    voiceHistory: Message[];
+    voiceSystemPrompt: string;
+    voiceSessionId: string | null;
+    isInitializing: boolean;
 }
 
 export interface InterviewFlowActions {
@@ -33,7 +39,7 @@ export interface InterviewFlowActions {
     setCompanyInfo: (companyInfo: string) => void;
     setMaxQuestions: (maxQuestions: number) => void;
     uploadResume: (file: File) => Promise<void>;
-    startInterview: () => Promise<void>;
+    startInterview: (mode?: 'mock' | 'voice') => Promise<void>;
     sendMessage: (content: string) => Promise<void>;
     stopStreaming: () => void;
     rollbackChat: (toIndex: number) => Promise<void>;
@@ -43,6 +49,15 @@ export interface InterviewFlowActions {
     setShowAbilityProfile: (show: boolean) => void;
     setApiError: (error: string | null) => void;
     clearApiError: () => void;
+    setVoiceMode: (isVoiceMode: boolean) => void;
+    // 语音面试 actions
+    setVoiceHistory: (history: Message[]) => void;
+    appendVoiceMessage: (message: Message) => void;
+    updateLastVoiceMessage: (content: string) => void;
+    setVoiceSystemPrompt: (prompt: string) => void;
+    setVoiceSessionId: (sessionId: string | null) => void;
+    clearVoiceState: () => void;
+    setInitializing: (isInitializing: boolean) => void;
 }
 
 export type InterviewFlowSlice = InterviewFlowState & InterviewFlowActions;
@@ -54,7 +69,7 @@ export type InterviewFlowSlice = InterviewFlowState & InterviewFlowActions;
 type SetState = (partial: Partial<InterviewFlowSlice> | ((state: InterviewFlowSlice) => Partial<InterviewFlowSlice>)) => void;
 type GetState = () => InterviewFlowSlice & {
     currentSession: InterviewSession | null;
-    fetchSessions: (status?: 'active' | 'completed' | 'archived', mode?: 'coach' | 'mock') => Promise<void>;
+    fetchSessions: (status?: 'active' | 'completed' | 'archived', mode?: 'mock' | 'voice') => Promise<void>;
     getApiConfigForRequest: () => { smart: { api_key: string; base_url: string; model: string }; fast: { api_key: string; base_url: string; model: string } } | null;
 };
 
@@ -71,7 +86,13 @@ export const createInterviewSlice = (set: SetState, get: GetState): InterviewFlo
     maxQuestions: 5,
     showAbilityProfile: false,
     apiError: null,
+    isVoiceMode: false,
     _abortController: null,
+    isInitializing: false,
+    // 语音面试初始状态
+    voiceHistory: [],
+    voiceSystemPrompt: '',
+    voiceSessionId: null,
 
     // ===== Actions =====
 
@@ -109,7 +130,7 @@ export const createInterviewSlice = (set: SetState, get: GetState): InterviewFlo
         }
     },
 
-    startInterview: async () => {
+    startInterview: async (mode: 'mock' | 'voice' = 'mock') => {
         const { resume, jobDescription, companyInfo, maxQuestions, getApiConfigForRequest } = get();
 
         if (!resume) {
@@ -121,28 +142,51 @@ export const createInterviewSlice = (set: SetState, get: GetState): InterviewFlo
             throw new Error('请先配置 API');
         }
 
-        set({ isLoading: true, messages: [] });
+        // 立即设置初始化状态、清除旧数据
+        set({
+            isLoading: true,
+            isInitializing: true, // 新增：显式标记正在初始化
+            messages: [],
+            voiceHistory: [],
+            voiceSystemPrompt: '',
+            voiceSessionId: null
+        });
 
-        // 1. 立即设置进度和当前会话（解决状态同步问题）
         const newThreadId = uuidv4();
-        // 使用类型断言处理跨 slice 状态更新
+        const now = new Date().toISOString();
+
+        // 构建临时的 currentSession 占位，防止页面因找不到 Session 而回滚到 landing
+        const sessionPlaceholder: InterviewSession = {
+            session_id: newThreadId,
+            title: '新模拟面试',
+            created_at: now,
+            updated_at: now,
+            metadata: {
+                mode: mode,
+                question_count: 0,
+                max_questions: maxQuestions,
+                status: 'active',
+            },
+            messages: [],
+        };
+
+        // 原子性更新所有视图相关状态
         (set as (partial: Record<string, unknown>) => void)({
             threadId: newThreadId,
             interviewProgress: { current: 0, total: maxQuestions },
-            currentSession: {
-                session_id: newThreadId,
-                title: '新模拟面试',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                metadata: {
-                    mode: 'mock',
-                    question_count: 0,
-                    max_questions: maxQuestions,
-                    status: 'active',
-                },
-                messages: [],
-            },
+            currentSession: sessionPlaceholder,
         });
+
+        // 如果是语音模式，仅到此为止，不调用文字版的 start 接口
+        // 之后的逻辑将由语音组件调用 /api/voice/start 完成
+        if (mode === 'voice') {
+            set({
+                isLoading: false,
+                // 注意：保持 isInitializing: true，由 VoiceInterview 组件在初始化完成后负责关闭
+                isVoiceMode: true
+            });
+            return;
+        }
 
         const abortController = new AbortController();
         set({ _abortController: abortController });
@@ -199,7 +243,7 @@ export const createInterviewSlice = (set: SetState, get: GetState): InterviewFlo
                             if (data.first_question) {
                                 set({
                                     messages: [{
-                                        role: 'ai',
+                                        role: 'assistant',
                                         content: data.first_question,
                                         timestamp: new Date().toISOString(),
                                     }],
@@ -216,11 +260,11 @@ export const createInterviewSlice = (set: SetState, get: GetState): InterviewFlo
                                         set(state => {
                                             const messages = [...state.messages];
                                             const lastMsg = messages[messages.length - 1];
-                                            if (lastMsg && lastMsg.role === 'ai') {
+                                            if (lastMsg && lastMsg.role === 'assistant') {
                                                 lastMsg.content = currentAiMessage;
                                             } else {
                                                 messages.push({
-                                                    role: 'ai',
+                                                    role: 'assistant',
                                                     content: currentAiMessage,
                                                     timestamp: new Date().toISOString(),
                                                 });
@@ -250,11 +294,11 @@ export const createInterviewSlice = (set: SetState, get: GetState): InterviewFlo
                                 set(state => {
                                     const messages = [...state.messages];
                                     const lastMsg = messages[messages.length - 1];
-                                    if (lastMsg && lastMsg.role === 'ai') {
+                                    if (lastMsg && lastMsg.role === 'assistant') {
                                         lastMsg.content = currentAiMessage;
                                     } else {
                                         messages.push({
-                                            role: 'ai',
+                                            role: 'assistant',
                                             content: currentAiMessage,
                                             timestamp: new Date().toISOString(),
                                         });
@@ -293,8 +337,8 @@ export const createInterviewSlice = (set: SetState, get: GetState): InterviewFlo
             }
 
             // 刷新会话列表
-            // 刷新会话列表，保持与页面初始化一致的过滤条件（获取所有状态的 mock 会话）
-            await get().fetchSessions(undefined, 'mock');
+            // 刷新会话列表，保持与页面初始化一致的过滤条件（获取所有状态的 mock/voice 会话）
+            await get().fetchSessions(undefined);
 
         } catch (error) {
             if ((error as Error).name !== 'AbortError') {
@@ -318,7 +362,7 @@ export const createInterviewSlice = (set: SetState, get: GetState): InterviewFlo
                 throw error;
             }
         } finally {
-            set({ isStreaming: false, isLoading: false, _abortController: null });
+            set({ isStreaming: false, isLoading: false, isInitializing: false, _abortController: null });
         }
     },
 
@@ -389,11 +433,11 @@ export const createInterviewSlice = (set: SetState, get: GetState): InterviewFlo
                                 set(state => {
                                     const messages = [...state.messages];
                                     const lastMsg = messages[messages.length - 1];
-                                    if (lastMsg && lastMsg.role === 'ai') {
+                                    if (lastMsg && lastMsg.role === 'assistant') {
                                         lastMsg.content = currentAiMessage;
                                     } else {
                                         messages.push({
-                                            role: 'ai',
+                                            role: 'assistant',
                                             content: currentAiMessage,
                                             timestamp: new Date().toISOString(),
                                         });
@@ -535,4 +579,40 @@ export const createInterviewSlice = (set: SetState, get: GetState): InterviewFlo
 
     setApiError: (error: string | null) => set({ apiError: error }),
     clearApiError: () => set({ apiError: null }),
+    setVoiceMode: (isVoiceMode: boolean) => set({ isVoiceMode }),
+
+    // ===== 语音面试 Actions =====
+
+    setVoiceHistory: (history: Message[]) => set({ voiceHistory: history }),
+
+    appendVoiceMessage: (message: Message) => {
+        set(state => ({
+            voiceHistory: [...state.voiceHistory, message]
+        }));
+    },
+
+    updateLastVoiceMessage: (content: string) => {
+        set(state => {
+            const history = [...state.voiceHistory];
+            if (history.length > 0 && history[history.length - 1].role === 'assistant') {
+                history[history.length - 1] = {
+                    ...history[history.length - 1],
+                    content
+                };
+            }
+            return { voiceHistory: history };
+        });
+    },
+
+    setVoiceSystemPrompt: (prompt: string) => set({ voiceSystemPrompt: prompt }),
+
+    setVoiceSessionId: (sessionId: string | null) => set({ voiceSessionId: sessionId }),
+
+    clearVoiceState: () => set({
+        voiceHistory: [],
+        voiceSystemPrompt: '',
+        voiceSessionId: null,
+    }),
+
+    setInitializing: (isInitializing: boolean) => set({ isInitializing }),
 });

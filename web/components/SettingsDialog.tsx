@@ -358,7 +358,8 @@ export function SettingsDialog({
         setMatchAnalystModel: onSetMatchAnalystModel,
         setContentWriterModel: onSetContentWriterModel,
         setHrReviewerModel: onSetHrReviewerModel,
-        setReflectorModel: onSetReflectorModel
+        setReflectorModel: onSetReflectorModel,
+        setVoiceModel: onSetVoiceModel
     } = useInterviewStore();
     const [showModelForm, setShowModelForm] = useState(false);
     const [editingModel, setEditingModel] = useState<ModelConfig | undefined>();
@@ -653,6 +654,35 @@ export function SettingsDialog({
                                             </select>
                                             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* 语音面试 */}
+                                <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                                    <h4 className="text-sm font-medium text-purple-800 mb-2">🎤 语音面试</h4>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-600">语音模型 (必须选择 Qwen3-Omni)</label>
+                                        <div className="relative">
+                                            <select
+                                                value={config.voiceModelId || ''}
+                                                onChange={(e) => onSetVoiceModel(e.target.value)}
+                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                            >
+                                                <option value="">选择模型</option>
+                                                {config.models
+                                                    .filter(m => m.model === 'qwen3-omni-flash-2025-12-01')
+                                                    .map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.name}
+                                                        </option>
+                                                    ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        </div>
+                                        <p className="text-xs text-purple-600 font-medium mt-1.5 flex items-center gap-1.5">
+                                            <AlertCircle className="w-3 h-3" />
+                                            语音功能仅支持：qwen3-omni-flash-2025-12-01
+                                        </p>
                                     </div>
                                 </div>
                             </>

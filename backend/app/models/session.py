@@ -10,15 +10,16 @@ from datetime import datetime
 
 class MessageItem(BaseModel):
     """单条消息模型"""
-    role: Literal["user", "ai", "system"] = Field(..., description="消息角色")
+    role: Literal["user", "assistant", "system"] = Field(..., description="消息角色")
     content: str = Field(..., description="消息内容")
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat(), description="消息时间戳")
     question_index: int = Field(default=0, description="对应的问题序号")
+    audio_url: Optional[str] = Field(None, description="音频URL或ID")
 
 
 class SessionMetadata(BaseModel):
     """会话元数据"""
-    mode: Literal["mock"] = Field(..., description="面试模式")
+    mode: Literal["mock", "voice"] = Field(..., description="面试模式")
     resume_filename: Optional[str] = Field(None, description="简历文件名")
     resume_content: Optional[str] = Field(None, description="简历全文内容")
     job_description: Optional[str] = Field(None, description="岗位描述")
@@ -32,6 +33,7 @@ class SessionMetadata(BaseModel):
     round_index: int = Field(default=1, description="轮次序号：1, 2, 3...")
     round_type: str = Field(default="tech_initial", description="面试类型")
     parent_session_id: Optional[str] = Field(None, description="上一轮Session ID")
+    interview_plan: List[Dict[str, Any]] = Field(default_factory=list, description="面试计划")
 
 
 class InterviewSession(BaseModel):
@@ -50,7 +52,7 @@ class SessionListItem(BaseModel):
     title: str = Field(..., description="会话标题")
     created_at: str = Field(..., description="创建时间")
     updated_at: str = Field(..., description="更新时间")
-    mode: Literal["mock"] = Field(..., description="面试模式")
+    mode: Literal["mock", "voice"] = Field(..., description="面试模式")
     status: Literal["active", "completed", "archived"] = Field(..., description="会话状态")
     message_count: int = Field(default=0, description="消息数量")
     question_count: int = Field(default=0, description="已提问数量")
@@ -63,7 +65,7 @@ class SessionListItem(BaseModel):
 class SessionCreateRequest(BaseModel):
     """创建会话请求"""
     title: Optional[str] = Field(None, description="会话标题（可选，自动生成）")
-    mode: Literal["mock"] = Field(..., description="面试模式")
+    mode: Literal["mock", "voice"] = Field(..., description="面试模式")
     resume_filename: Optional[str] = Field(None, description="简历文件名")
     job_description: Optional[str] = Field(None, description="岗位描述")
     max_questions: int = Field(default=5, description="最大问题数量")

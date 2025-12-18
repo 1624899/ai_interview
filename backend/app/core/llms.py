@@ -78,3 +78,20 @@ def get_llm_for_request(api_config: Optional[dict] = None, channel: str = "smart
         model=channel_config["model"],
         max_tokens=8000
     )
+
+
+def get_async_omni_client(voice_config: dict):
+    """
+    根据前端传入的配置创建 异步 OpenAI 客户端 (用于流式语音模型)
+    
+    使用 AsyncOpenAI 实现真正的流式输出，避免阻塞事件循环
+    """
+    from openai import AsyncOpenAI
+    
+    if not voice_config or not voice_config.get("api_key"):
+        raise ValueError("未检测到语音模型 API 配置")
+        
+    return AsyncOpenAI(
+        api_key=voice_config["api_key"],
+        base_url=voice_config["base_url"],
+    )

@@ -11,13 +11,14 @@ import { ResumeAnalyzeResult, ResumeOptimizeResult } from '@/lib/api/resume';
 // ============================================================================
 
 export interface Message {
-    role: 'user' | 'ai' | 'system';
+    role: 'user' | 'assistant' | 'system';
     content: string;
     timestamp: string;
+    audio_url?: string;
 }
 
 export interface SessionMetadata {
-    mode: 'coach' | 'mock';
+    mode: 'mock' | 'voice';
     resume_filename?: string;
     job_description?: string;
     question_count: number;
@@ -41,7 +42,7 @@ export interface SessionListItem {
     title: string;
     created_at: string;
     updated_at: string;
-    mode: 'coach' | 'mock';
+    mode: 'mock' | 'voice';
     status: 'active' | 'completed' | 'archived';
     message_count: number;
     question_count: number;
@@ -76,6 +77,7 @@ export interface ApiConfig {
     contentWriterModelId: string;  // 内容优化师
     hrReviewerModelId: string;     // HR审核官
     reflectorModelId: string;      // 质量审核
+    voiceModelId: string;          // 语音面试 (Qwen3-Omni)
 }
 
 export interface InterviewProgress {
@@ -104,7 +106,7 @@ export const API_PROVIDERS = [
     { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', apiKeyUrl: 'https://platform.openai.com/api-keys', models: ['gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-4o-mini', 'gpt-4o'] },
     { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', apiKeyUrl: 'https://platform.deepseek.com/api_keys', models: ['deepseek-chat', 'deepseek-reasoner'] },
     { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', apiKeyUrl: 'https://open.bigmodel.cn/usercenter/apikeys', models: ['glm-4.6', 'glm-4.5', 'glm-4-flash', 'glm-4-air'] },
-    { id: 'aliyun', name: '阿里云百炼', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', apiKeyUrl: 'https://bailian.console.aliyun.com/#/api-key', models: ['qwen3-max', 'qwen3-235b-a22b-instruct-2507', 'deepseek-v3.2', 'Moonshot-Kimi-K2-Instruct', 'qwen3-next-80b-a3b-instruct', 'qwen3-30b-a3b-instruct-2507'] },
+    { id: 'aliyun', name: '阿里云百炼 (含语音配置)', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', apiKeyUrl: 'https://bailian.console.aliyun.com/#/api-key', models: ['qwen3-omni-flash-2025-12-01', 'qwen3-max', 'qwen3-235b-a22b-instruct-2507', 'deepseek-v3.2', 'Moonshot-Kimi-K2-Instruct', 'qwen3-next-80b-a3b-instruct', 'qwen3-30b-a3b-instruct-2507'] },
     { id: 'moonshot', name: 'Moonshot', baseUrl: 'https://api.moonshot.cn/v1', apiKeyUrl: 'https://platform.moonshot.cn/console/api-keys', models: ['kimi-k2-thinking', 'kimi-k2-turbo-preview', 'kimi-k2'] },
     { id: 'siliconflow', name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', apiKeyUrl: 'https://cloud.siliconflow.cn/account/ak', models: ['deepseek-ai/DeepSeek-V3.2', 'MiniMaxAI/MiniMax-M2', 'zai-org/GLM-4.6', 'moonshotai/Kimi-K2-Instruct-0905'] },
     { id: 'iflow', name: '心流开放平台（免费）', baseUrl: 'https://apis.iflow.cn/v1', apiKeyUrl: 'https://platform.iflow.cn/profile?tab=apiKey', models: ['qwen3-max', 'qwen3-coder-plus', 'glm-4.6', 'kimi-k2', 'qwen3-235b-a22b-instruct', 'deepseek-v3.2'] },
@@ -122,6 +124,7 @@ export const DEFAULT_API_CONFIG: ApiConfig = {
     contentWriterModelId: '',
     hrReviewerModelId: '',
     reflectorModelId: '',
+    voiceModelId: '',
 };
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';

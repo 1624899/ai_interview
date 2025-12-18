@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, FileText, Loader2, RefreshCw, AlertCircle, BrainCircuit, Maximize2 } from "lucide-react";
+import { Upload, FileText, Loader2, RefreshCw, AlertCircle, BrainCircuit, Maximize2, MessageSquare, Headphones } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
+type InterviewMode = "text" | "voice";
+
 interface InterviewSetupProps {
     resume: { original_name: string; content?: string } | null;
     onUploadResume: (file: File) => Promise<void>;
@@ -25,8 +27,9 @@ interface InterviewSetupProps {
     onMaxQuestionsChange: (value: number) => void;
     isLoading: boolean;
     hasApiConfig: boolean;
-    onStartInterview: () => Promise<void>;
+    onStartInterview: (mode: InterviewMode) => Promise<void>;
     onConfigureApi: () => void;
+    hasVoiceConfig?: boolean;  // 是否配置了语音模型
 }
 
 export function InterviewSetup({
@@ -41,10 +44,12 @@ export function InterviewSetup({
     isLoading,
     hasApiConfig,
     onStartInterview,
-    onConfigureApi
+    onConfigureApi,
+    hasVoiceConfig = false
 }: InterviewSetupProps) {
     const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
     const [tempJobDescription, setTempJobDescription] = useState("");
+    const [selectedMode, setSelectedMode] = useState<InterviewMode>("text");
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -62,11 +67,15 @@ export function InterviewSetup({
         setIsJobDialogOpen(false);
     };
 
+    const handleStartInterview = async () => {
+        await onStartInterview(selectedMode);
+    };
+
     return (
         <>
-            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 space-y-8">
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-5 space-y-5">
                 {/* 1. 上传简历 */}
-                <div className="space-y-3">
+                <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                         <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-100 text-teal-600 text-xs font-bold">1</span>
                         上传简历 (PDF/Word)
@@ -79,7 +88,7 @@ export function InterviewSetup({
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         />
                         <div className={cn(
-                            "w-full h-14 rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all",
+                            "w-full h-12 rounded-lg border-2 border-dashed flex items-center justify-center gap-2 transition-all text-sm",
                             resume
                                 ? "border-teal-200 bg-teal-50 text-teal-700"
                                 : "border-gray-200 bg-gray-50 text-gray-400 group-hover:border-teal-300 group-hover:bg-teal-50/30"
@@ -179,6 +188,103 @@ export function InterviewSetup({
                     </p>
                 </div>
 
+                {/* 4. 面试模式选择 */}
+                <div className="space-y-3">
+                    <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-100 text-teal-600 text-xs font-bold">4</span>
+                        面试模式
+                    </label>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* 文字模式 */}
+                        <button
+                            type="button"
+                            onClick={() => setSelectedMode("text")}
+                            className={cn(
+                                "relative p-4 rounded-xl border-2 transition-all text-left",
+                                selectedMode === "text"
+                                    ? "border-teal-500 bg-teal-50 ring-2 ring-teal-100"
+                                    : "border-gray-200 bg-white hover:border-gray-300"
+                            )}
+                        >
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className={cn(
+                                    "w-10 h-10 rounded-full flex items-center justify-center",
+                                    selectedMode === "text" ? "bg-teal-100" : "bg-gray-100"
+                                )}>
+                                    <MessageSquare className={cn(
+                                        "w-5 h-5",
+                                        selectedMode === "text" ? "text-teal-600" : "text-gray-500"
+                                    )} />
+                                </div>
+                                <div>
+                                    <h4 className={cn(
+                                        "font-semibold",
+                                        selectedMode === "text" ? "text-teal-700" : "text-gray-700"
+                                    )}>文字对话</h4>
+                                    <p className="text-xs text-gray-500">打字回答问题</p>
+                                </div>
+                            </div>
+                            {selectedMode === "text" && (
+                                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-teal-500 flex items-center justify-center">
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                            )}
+                        </button>
+
+                        {/* 语音模式 */}
+                        <button
+                            type="button"
+                            onClick={() => hasVoiceConfig && setSelectedMode("voice")}
+                            disabled={!hasVoiceConfig}
+                            className={cn(
+                                "relative p-4 rounded-xl border-2 transition-all text-left",
+                                !hasVoiceConfig && "opacity-60 cursor-not-allowed",
+                                selectedMode === "voice"
+                                    ? "border-purple-500 bg-purple-50 ring-2 ring-purple-100"
+                                    : "border-gray-200 bg-white hover:border-gray-300"
+                            )}
+                        >
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className={cn(
+                                    "w-10 h-10 rounded-full flex items-center justify-center",
+                                    selectedMode === "voice" ? "bg-purple-100" : "bg-gray-100"
+                                )}>
+                                    <Headphones className={cn(
+                                        "w-5 h-5",
+                                        selectedMode === "voice" ? "text-purple-600" : "text-gray-500"
+                                    )} />
+                                </div>
+                                <div>
+                                    <h4 className={cn(
+                                        "font-semibold",
+                                        selectedMode === "voice" ? "text-purple-700" : "text-gray-700"
+                                    )}>语音对话</h4>
+                                    <p className="text-xs text-gray-500">
+                                        {hasVoiceConfig ? "像打电话一样交流" : "需配置语音模型"}
+                                    </p>
+                                </div>
+                            </div>
+                            {selectedMode === "voice" && (
+                                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center">
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                            )}
+                            {!hasVoiceConfig && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-white/50 rounded-xl">
+                                    <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded shadow-sm">
+                                        请先在设置中配置语音模型
+                                    </span>
+                                </div>
+                            )}
+                        </button>
+                    </div>
+                </div>
+
                 {/* API 配置提示 */}
                 {!hasApiConfig && (
                     <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
@@ -200,14 +306,25 @@ export function InterviewSetup({
                     </div>
                 )}
 
-                {/* 4. 开始按钮 */}
+                {/* 5. 开始按钮 */}
                 <Button
-                    className="w-full h-12 text-base font-medium bg-teal-600 hover:bg-teal-700 shadow-lg shadow-teal-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={onStartInterview}
+                    className={cn(
+                        "w-full h-12 text-base font-medium shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+                        selectedMode === "voice"
+                            ? "bg-purple-600 hover:bg-purple-700 shadow-purple-200"
+                            : "bg-teal-600 hover:bg-teal-700 shadow-teal-200"
+                    )}
+                    onClick={handleStartInterview}
                     disabled={!resume || !jobDescription.trim() || isLoading || !hasApiConfig}
                 >
-                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <BrainCircuit className="mr-2 h-5 w-5" />}
-                    开始面试
+                    {isLoading ? (
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    ) : selectedMode === "voice" ? (
+                        <Headphones className="mr-2 h-5 w-5" />
+                    ) : (
+                        <BrainCircuit className="mr-2 h-5 w-5" />
+                    )}
+                    {selectedMode === "voice" ? "开始语音面试" : "开始面试"}
                 </Button>
             </div>
 
@@ -245,3 +362,4 @@ export function InterviewSetup({
         </>
     );
 }
+

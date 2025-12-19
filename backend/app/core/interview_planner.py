@@ -165,6 +165,10 @@ def build_planner_prompt(
     {requirements}
     【重要】：你只能生成 {max_questions} 道题目。
     
+    【问题内容规范】：
+    1. 每个问题必须是直接的、具体的问题，不要包含元语言
+    2. 保持问题的自然性和专业性，就像真实面试官会问的问题
+    
     请严格按照以下 JSON 结构输出数组，确保包含所有字段。
     不要包含 markdown 格式（如 ```json ... ```），只输出纯 JSON 字符串，使用英文字符，禁止使用emoji。
     {json_format}

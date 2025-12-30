@@ -357,7 +357,7 @@ export default function InterviewPage() {
 
   if (!isMounted) {
     return (
-      <div className="flex h-screen items-center justify-center bg-white">
+      <div className="flex h-[100dvh] items-center justify-center bg-white">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     );
@@ -382,7 +382,7 @@ export default function InterviewPage() {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-white text-[#1d1d1f] font-sans antialiased">
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-white text-[#1d1d1f] font-sans antialiased">
 
       {/* 侧边栏 */}
       <SessionSidebar
@@ -394,7 +394,7 @@ export default function InterviewPage() {
       />
 
       {/* 主内容区域 */}
-      <main className="flex-1 flex flex-col h-full relative bg-white overflow-hidden">
+      <main className="flex-1 flex flex-col min-h-0 relative bg-white overflow-hidden">
 
         {/* 顶部导航栏 */}
         <div className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
@@ -436,7 +436,7 @@ export default function InterviewPage() {
         {/* 视图切换逻辑 */}
         {activeMainTab === "resume" ? (
           /* 简历工具视图 */
-          <div className="flex-1 overflow-hidden p-6">
+          <div className="flex-1 overflow-y-auto p-6 min-h-0">
             <div className="max-w-6xl mx-auto h-full">
               <ResumeTools
                 apiConfig={hasApiConfig ? useInterviewStore.getState().getApiConfigForRequest() : null}
@@ -449,7 +449,7 @@ export default function InterviewPage() {
           </div>
         ) : showAbilityProfile ? (
           // 能力画像视图
-          <div className="flex-1 flex flex-col h-full relative">
+          <div className="flex-1 flex flex-col min-h-0 relative overflow-y-auto">
             <div className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
               <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-4">
                 <Button
@@ -471,7 +471,7 @@ export default function InterviewPage() {
           </div>
         ) : showSetup ? (
           // 面试配置页 (New Session / Setup)
-          <div className="flex-1 flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 relative bg-gray-50/30">
+          <div className="flex-1 flex flex-col items-center justify-start sm:justify-center p-6 animate-in fade-in duration-500 relative bg-gray-50/30 overflow-y-auto min-h-0">
             {/* 背景装饰 */}
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-teal-50/50 via-white to-white pointer-events-none" />
 
@@ -501,7 +501,7 @@ export default function InterviewPage() {
         ) : (
           // 聊天界面
           <InterviewArea>
-            <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {/* 面试进度条 - 仅在有消息时显示 */}
               {interviewProgress && interviewProgress.total > 0 && messages.length > 0 && (
                 <div className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">

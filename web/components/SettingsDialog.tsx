@@ -34,105 +34,6 @@ interface ModelFormDialogProps {
     initialValues?: Partial<ModelConfig>;
 }
 
-// 提取可复用的配置教程组件
-function ConfigurationTutorial({ onClose }: { onClose: () => void }) {
-    return (
-        <div className="p-5 rounded-2xl border border-teal-100 bg-teal-50/40 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300 shadow-inner">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-base font-bold text-teal-900">
-                    <HelpCircle className="w-5 h-5" />
-                    小白配置全攻略 (2026年1月版)
-                </div>
-                <button onClick={onClose} className="text-teal-400 hover:text-teal-600 text-xl font-light">×</button>
-            </div>
-
-            {/* 1. 核心概念 */}
-            <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-white/60 rounded-xl border border-teal-50">
-                    <div className="font-bold text-xs text-teal-800 mb-1 flex items-center gap-1">
-                        <Key className="w-3 h-3" /> API Key 是什么？
-                    </div>
-                    <p className="text-[11px] text-teal-600 leading-snug">就像是给 AI 拨号的“手机卡卡密”，每个账号独有且必须有余额才能通话。</p>
-                </div>
-                <div className="p-3 bg-white/60 rounded-xl border border-teal-50">
-                    <div className="font-bold text-xs text-teal-800 mb-1 flex items-center gap-1">
-                        <ExternalLink className="w-3 h-3" /> Base URL 是什么？
-                    </div>
-                    <p className="text-[11px] text-teal-600 leading-snug">AI 的“服务器地址”，通常以 <code>/v1</code> 结尾，不能填错。</p>
-                </div>
-            </div>
-
-            {/* 2. 步骤引导 */}
-            <div className="space-y-3">
-                <div className="flex gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-bold">1</div>
-                    <div className="space-y-1">
-                        <p className="text-sm font-bold text-teal-900">获取密钥 (免费福利推荐)</p>
-                        <p className="text-[11px] text-teal-700 leading-relaxed">
-                            首选 <a href="https://www.aiping.cn/#?invitation_code=SJY0NW" target="_blank" className="underline font-bold text-orange-600">AI Ping</a> 注册（通过链接注册或输入邀请码 <b>SJY0NW</b> 可领<b>20元</b>算力点奖励）
-                        </p>
-                    </div>
-                </div>
-                <div className="flex gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-bold">2</div>
-                    <div className="space-y-1">
-                        <p className="text-sm font-bold text-teal-900">录入模型配置</p>
-                        <p className="text-[11px] text-teal-700">点击下方的 <span className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-gray-400"><Plus className="w-2.5 h-2.5 inline" /></span> 按钮，提供商选 <b>AI Ping</b> 或 <b>其他免费提供商</b>，粘贴 Key，保存即可。</p>
-                    </div>
-                </div>
-                <div className="flex gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-bold">3</div>
-                    <div className="space-y-1">
-                        <p className="text-sm font-bold text-teal-900">分配各个“大脑”任务</p>
-                        <p className="text-[11px] text-teal-700 leading-relaxed">
-                            在下方下拉框中选择你刚才添加的模型：<br />
-                            - <b>Smart (指挥官):</b> 选 <code>deepseek-v3</code> 或 <code>qwen3-max</code>。<br />
-                            - <b>Fast (对话员):</b> 选 <code>mimo-v2-flash</code>，速度极快顺滑。
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* 3. 最佳方案推荐 */}
-            <div className="p-3 bg-teal-600/5 rounded-xl border border-teal-200 dashed">
-                <div className="text-xs font-bold text-teal-900 mb-2 flex items-center gap-1.5">
-                    <Award className="w-4 h-4 text-orange-500" /> 当前最省心组合方案（均可免费白嫖）
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-[10px]">
-                    <div className="flex items-center gap-1 text-teal-800">
-                        <span className="w-1 h-1 rounded-full bg-teal-400"></span>
-                        主力任务：Qwen3-Max
-                    </div>
-                    <div className="flex items-center gap-1 text-teal-800">
-                        <span className="w-1 h-1 rounded-full bg-teal-400"></span>
-                        对话任务：MiMo-V2
-                    </div>
-                    <div className="flex items-center gap-1 text-teal-800">
-                        <span className="w-1 h-1 rounded-full bg-teal-400"></span>
-                        通用任务：GLM-4.7
-                    </div>
-                    <div className="flex items-center gap-1 text-teal-800">
-                        <span className="w-1 h-1 rounded-full bg-teal-400"></span>
-                        语音面试：Qwen3-Omni
-                    </div>
-                </div>
-            </div>
-
-            <div className="pt-2 border-t border-teal-100/50 flex items-center justify-between">
-                <div className="flex gap-2.5">
-                    {API_PROVIDERS.filter(p => p.apiKeyUrl).slice(0, 3).map(p => (
-                        <a key={p.id} href={p.apiKeyUrl} target="_blank" className="flex items-center gap-0.5 text-[10px] text-teal-600 hover:underline">
-                            <ExternalLink className="w-2 h-2" />
-                            {p.name.split('(')[0]}
-                        </a>
-                    ))}
-                </div>
-                <span className="text-[10px] text-teal-500 italic">设置将实时保存到浏览器本地</span>
-            </div>
-        </div>
-    );
-}
-
 function ModelFormDialog({ open, onClose, onSave, editingModel, initialValues }: ModelFormDialogProps) {
     const [provider, setProvider] = useState(editingModel?.provider || '');
     const [apiKey, setApiKey] = useState(editingModel?.apiKey || '');
@@ -280,8 +181,15 @@ function ModelFormDialog({ open, onClose, onSave, editingModel, initialValues }:
                     <div className="space-y-5">
                         {/* 配置教程面板 */}
                         {showTutorial && (
-                            <div className="mb-5">
-                                <ConfigurationTutorial onClose={() => setShowTutorial(false)} />
+                            <div className="mb-5 p-4 rounded-xl border border-teal-100 bg-teal-50/40 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="flex items-center gap-2 text-sm font-bold text-teal-800">
+                                    <Award className="w-4 h-4 text-orange-500" /> 快速配置建议
+                                </div>
+                                <div className="space-y-2 text-[11px] text-teal-700 leading-relaxed">
+                                    <p>1. <strong>获取福利：</strong> 推荐使用 <a href="https://www.aiping.cn/#?invitation_code=SJY0NW" target="_blank" className="underline font-bold text-orange-600 font-bold underline">AI Ping</a> 注册，输入邀请码 <b>SJY0NW</b> 可领 <b>20元</b> 奖励。</p>
+                                    <p>2. <strong>填写说明：</strong> 选择提供商后会自动填入 Base URL。你只需要粘贴你的 <b>API Key</b> ，并选择模型配置即可。</p>
+                                    <p>3. <strong>测试连接：</strong> 保存前请务必点击底部的“测试连接”，确保配置有效。</p>
+                                </div>
                             </div>
                         )}
                         {/* API 提供商 */}
@@ -567,8 +475,98 @@ export function SettingsDialog({
                         <div className="space-y-5">
                             {/* 配置教程面板 */}
                             {showTutorial && (
-                                <div className="mb-5">
-                                    <ConfigurationTutorial onClose={() => setShowTutorial(false)} />
+                                <div className="p-5 rounded-2xl border border-teal-100 bg-teal-50/40 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300 shadow-inner">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-base font-bold text-teal-900">
+                                            <HelpCircle className="w-5 h-5" />
+                                            小白配置全攻略 (2026年1月版)
+                                        </div>
+                                        <button onClick={() => setShowTutorial(false)} className="text-teal-400 hover:text-teal-600">×</button>
+                                    </div>
+
+                                    {/* 1. 核心概念 */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="p-3 bg-white/60 rounded-xl border border-teal-50">
+                                            <div className="font-bold text-xs text-teal-800 mb-1 flex items-center gap-1">
+                                                <Key className="w-3 h-3" /> API Key 是什么？
+                                            </div>
+                                            <p className="text-[11px] text-teal-600 leading-snug">就像是给 AI 拨号的“手机卡卡密”，每个账号独有且必须有余额才能通话。</p>
+                                        </div>
+                                        <div className="p-3 bg-white/60 rounded-xl border border-teal-50">
+                                            <div className="font-bold text-xs text-teal-800 mb-1 flex items-center gap-1">
+                                                <ExternalLink className="w-3 h-3" /> Base URL 是什么？
+                                            </div>
+                                            <p className="text-[11px] text-teal-600 leading-snug">AI 的“服务器地址”，通常以 <code>/v1</code> 结尾，不能填错。</p>
+                                        </div>
+                                    </div>
+
+                                    {/* 2. 步骤引导 */}
+                                    <div className="space-y-3">
+                                        <div className="flex gap-3">
+                                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-bold">1</div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm font-bold text-teal-900">获取密钥 (福利推荐)</p>
+                                                <p className="text-[11px] text-teal-700 leading-relaxed">
+                                                    首选 <a href="https://www.aiping.cn/#?invitation_code=SJY0NW" target="_blank" className="underline font-bold text-orange-600">AI Ping</a> 注册（通过此链接或者输入邀请码 <b>SJY0NW</b> 可领<b>20元</b>算力点奖励）
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-bold">2</div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm font-bold text-teal-900">录入模型配置</p>
+                                                <p className="text-[11px] text-teal-700">点击下方的 <span className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-gray-400"><Plus className="w-2.5 h-2.5 inline" /></span> 按钮，提供商选 <b>AI Ping</b> 或 <b>其他免费模型提供商</b>，粘贴 Key，保存即可。</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-bold">3</div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm font-bold text-teal-900">分配各个“大脑”任务</p>
+                                                <p className="text-[11px] text-teal-700 leading-relaxed">
+                                                    在下方下拉框中选择你刚才添加的模型：<br />
+                                                    - <b>Smart (指挥官):</b> 选 <code>deepseek-v3</code> 或 <code>qwen3-max</code>。<br />
+                                                    - <b>Fast (对话员):</b> 选 <code>mimo-v2-flash</code>，速度极快顺滑。
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 3. 最佳方案推荐 */}
+                                    <div className="p-3 bg-teal-600/5 rounded-xl border border-teal-200 dashed">
+                                        <div className="text-xs font-bold text-teal-900 mb-2 flex items-center gap-1.5">
+                                            <Award className="w-4 h-4 text-orange-500" /> 当前最省心组合方案（均可免费白嫖）
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                            <div className="flex items-center gap-1 text-teal-800">
+                                                <span className="w-1 h-1 rounded-full bg-teal-400"></span>
+                                                主力模型：Qwen3-Max（心流）
+                                            </div>
+                                            <div className="flex items-center gap-1 text-teal-800">
+                                                <span className="w-1 h-1 rounded-full bg-teal-400"></span>
+                                                对话模型：MiMo-V2（ai ping）
+                                            </div>
+                                            <div className="flex items-center gap-1 text-teal-800">
+                                                <span className="w-1 h-1 rounded-full bg-teal-400"></span>
+                                                通用任务：GLM-4.7（ai ping）
+                                            </div>
+                                            <div className="flex items-center gap-1 text-teal-800">
+                                                <span className="w-1 h-1 rounded-full bg-teal-400"></span>
+                                                语音面试：Qwen3-Omni（阿里云百炼）
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2 border-t border-teal-100/50 flex items-center justify-between">
+                                        <div className="flex gap-2.5">
+                                            {API_PROVIDERS.filter(p => p.apiKeyUrl).slice(0, 3).map(p => (
+                                                <a key={p.id} href={p.apiKeyUrl} target="_blank" className="flex items-center gap-0.5 text-[10px] text-teal-600 hover:underline">
+                                                    <ExternalLink className="w-2 h-2" />
+                                                    {p.name.split('(')[0]}
+                                                </a>
+                                            ))}
+                                        </div>
+                                        <span className="text-[10px] text-teal-500 italic">设置将实时保存到浏览器本地</span>
+                                    </div>
                                 </div>
                             )}
                             {/* 添加模型区域 - 水平排列的卡片 */}

@@ -146,8 +146,8 @@ function ModelFormDialog({ open, onClose, onSave, editingModel, initialValues }:
 
     return (
         <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-            <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] p-0 flex flex-col gap-0 overflow-hidden">
+                <DialogHeader className="p-6 pb-4 border-b">
                     <DialogTitle className="flex items-center gap-2">
                         <ChevronLeft className="w-5 h-5 cursor-pointer hover:text-teal-600" onClick={onClose} />
                         {editingModel ? '编辑模型配置' : '添加模型配置'}
@@ -157,148 +157,150 @@ function ModelFormDialog({ open, onClose, onSave, editingModel, initialValues }:
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-5 py-4">
-                    {/* API 提供商 */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                            API 提供商
-                        </label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {API_PROVIDERS.map((p) => (
-                                <button
-                                    key={p.id}
-                                    onClick={() => handleProviderChange(p.id)}
-                                    className={cn(
-                                        "px-3 py-2 text-sm rounded-lg border transition-all",
-                                        provider === p.id
-                                            ? "border-teal-500 bg-teal-50 text-teal-700 font-medium"
-                                            : "border-gray-200 hover:border-gray-300 text-gray-600"
-                                    )}
-                                >
-                                    {p.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* API Key */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                            API Key <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                            <input
-                                type={showApiKey ? 'text' : 'password'}
-                                value={apiKey}
-                                onChange={(e) => setApiKey(e.target.value)}
-                                autoComplete="new-password"
-                                name="api-key-field"
-                                className="w-full rounded-lg border border-gray-200 px-4 py-2.5 pr-12 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowApiKey(!showApiKey)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                                {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                        </div>
-                        {currentProvider?.apiKeyUrl ? (
-                            <p className="text-xs text-teal-600">
-                                <a
-                                    href={currentProvider.apiKeyUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="hover:underline inline-flex items-center gap-1"
-                                >
-                                    → 点击获取 {currentProvider.name} API Key
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                    </svg>
-                                </a>
-                            </p>
-                        ) : (
-                            <p className="text-xs text-gray-400">
-                                您的 API Key 仅保存在浏览器本地，不会上传到服务器
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Base URL */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                            Base URL <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            value={baseUrl}
-                            onChange={(e) => setBaseUrl(e.target.value)}
-                            className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none"
-                            placeholder="https://api.openai.com/v1"
-                        />
-                    </div>
-
-                    {/* 模型配置 */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                            模型配置 <span className="text-red-500">*</span>
-                        </label>
-                        {currentProvider && currentProvider.models.length > 0 ? (
-                            <select
-                                value={model}
-                                onChange={(e) => setModel(e.target.value)}
-                                className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
-                            >
-                                <option value="">选择模型</option>
-                                {currentProvider.models.map((m) => (
-                                    <option key={m} value={m}>{m}</option>
+                <div className="flex-1 overflow-y-auto p-6">
+                    <div className="space-y-5">
+                        {/* API 提供商 */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">
+                                API 提供商
+                            </label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {API_PROVIDERS.map((p) => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => handleProviderChange(p.id)}
+                                        className={cn(
+                                            "px-3 py-2 text-sm rounded-lg border transition-all",
+                                            provider === p.id
+                                                ? "border-teal-500 bg-teal-50 text-teal-700 font-medium"
+                                                : "border-gray-200 hover:border-gray-300 text-gray-600"
+                                        )}
+                                    >
+                                        {p.name}
+                                    </button>
                                 ))}
-                            </select>
-                        ) : (
+                            </div>
+                        </div>
+
+                        {/* API Key */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">
+                                API Key <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type={showApiKey ? 'text' : 'password'}
+                                    value={apiKey}
+                                    onChange={(e) => setApiKey(e.target.value)}
+                                    autoComplete="new-password"
+                                    name="api-key-field"
+                                    className="w-full rounded-lg border border-gray-200 px-4 py-2.5 pr-12 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowApiKey(!showApiKey)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                            </div>
+                            {currentProvider?.apiKeyUrl ? (
+                                <p className="text-xs text-teal-600">
+                                    <a
+                                        href={currentProvider.apiKeyUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="hover:underline inline-flex items-center gap-1"
+                                    >
+                                        → 点击获取 {currentProvider.name} API Key
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                    </a>
+                                </p>
+                            ) : (
+                                <p className="text-xs text-gray-400">
+                                    您的 API Key 仅保存在浏览器本地，不会上传到服务器
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Base URL */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">
+                                Base URL <span className="text-red-500">*</span>
+                            </label>
                             <input
                                 type="text"
-                                value={model}
-                                onChange={(e) => setModel(e.target.value)}
+                                value={baseUrl}
+                                onChange={(e) => setBaseUrl(e.target.value)}
                                 className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none"
-                                placeholder="输入模型名称，如 gpt-4o"
+                                placeholder="https://api.openai.com/v1"
                             />
+                        </div>
+
+                        {/* 模型配置 */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">
+                                模型配置 <span className="text-red-500">*</span>
+                            </label>
+                            {currentProvider && currentProvider.models.length > 0 ? (
+                                <select
+                                    value={model}
+                                    onChange={(e) => setModel(e.target.value)}
+                                    className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                >
+                                    <option value="">选择模型</option>
+                                    {currentProvider.models.map((m) => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    type="text"
+                                    value={model}
+                                    onChange={(e) => setModel(e.target.value)}
+                                    className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none"
+                                    placeholder="输入模型名称，如 gpt-4o"
+                                />
+                            )}
+                        </div>
+
+                        {/* 配置名称（可选） */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">
+                                配置名称 <span className="text-gray-400 text-xs">（可选）</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                autoComplete="off"
+                                name="config-name-field"
+                                className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none"
+                            />
+                        </div>
+
+                        {/* 测试连接结果 */}
+                        {testResult && (
+                            <div className={cn(
+                                "flex items-center gap-2 p-3 rounded-lg text-sm",
+                                testResult.success
+                                    ? "bg-green-50 text-green-700 border border-green-200"
+                                    : "bg-red-50 text-red-700 border border-red-200"
+                            )}>
+                                {testResult.success ? (
+                                    <Check className="w-4 h-4 flex-shrink-0" />
+                                ) : (
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                )}
+                                {testResult.message}
+                            </div>
                         )}
                     </div>
-
-                    {/* 配置名称（可选） */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                            配置名称 <span className="text-gray-400 text-xs">（可选）</span>
-                        </label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            autoComplete="off"
-                            name="config-name-field"
-                            className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none"
-                        />
-                    </div>
-
-                    {/* 测试连接结果 */}
-                    {testResult && (
-                        <div className={cn(
-                            "flex items-center gap-2 p-3 rounded-lg text-sm",
-                            testResult.success
-                                ? "bg-green-50 text-green-700 border border-green-200"
-                                : "bg-red-50 text-red-700 border border-red-200"
-                        )}>
-                            {testResult.success ? (
-                                <Check className="w-4 h-4 flex-shrink-0" />
-                            ) : (
-                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                            )}
-                            {testResult.message}
-                        </div>
-                    )}
                 </div>
 
-                <DialogFooter className="flex-col sm:flex-row gap-2">
+                <DialogFooter className="p-6 pt-4 border-t bg-gray-50/50 flex-col sm:flex-row gap-2">
                     {!testResult && (
                         <div className="flex items-center gap-2 px-1 pb-2">
                             <span className="relative flex h-2 w-2">
@@ -408,8 +410,8 @@ export function SettingsDialog({
     return (
         <>
             <Dialog open={open && !showModelForm} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto">
-                    <DialogHeader>
+                <DialogContent className="sm:max-w-[550px] max-h-[90vh] p-0 flex flex-col gap-0 overflow-hidden">
+                    <DialogHeader className="p-6 pb-4 border-b">
                         <DialogTitle className="flex items-center gap-2">
                             <Settings className="w-5 h-5 text-teal-600" />
                             API 设置
@@ -419,284 +421,286 @@ export function SettingsDialog({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-5 py-4">
-                        {/* 添加模型区域 - 水平排列的卡片 */}
-                        <div className="space-y-3">
-                            <label className="text-sm font-medium text-gray-700">添加模型：</label>
-                            <div className="flex flex-wrap gap-3">
-                                {/* 已配置的模型卡片 */}
-                                {config.models.map((model) => {
-                                    const provider = API_PROVIDERS.find(p => p.id === model.provider);
-                                    return (
-                                        <div
-                                            key={model.id}
-                                            onClick={() => handleEditModel(model)}
-                                            className="group relative px-4 py-3 rounded-xl border border-gray-200 bg-white hover:border-teal-400 hover:shadow-sm transition-all cursor-pointer min-w-[120px]"
-                                        >
-                                            <div className="text-sm font-medium text-gray-900 truncate max-w-[100px]">
-                                                {model.name.split(' - ')[0]}
+                    <div className="flex-1 overflow-y-auto p-6">
+                        <div className="space-y-5">
+                            {/* 添加模型区域 - 水平排列的卡片 */}
+                            <div className="space-y-3">
+                                <label className="text-sm font-medium text-gray-700">添加模型：</label>
+                                <div className="flex flex-wrap gap-3">
+                                    {/* 已配置的模型卡片 */}
+                                    {config.models.map((model) => {
+                                        const provider = API_PROVIDERS.find(p => p.id === model.provider);
+                                        return (
+                                            <div
+                                                key={model.id}
+                                                onClick={() => handleEditModel(model)}
+                                                className="group relative px-4 py-3 rounded-xl border border-gray-200 bg-white hover:border-teal-400 hover:shadow-sm transition-all cursor-pointer min-w-[120px]"
+                                            >
+                                                <div className="text-sm font-medium text-gray-900 truncate max-w-[100px]">
+                                                    {model.name.split(' - ')[0]}
+                                                </div>
+                                                <div className="text-xs text-gray-400 truncate">
+                                                    {model.model}
+                                                </div>
+                                                <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={(e) => handleDuplicateModel(model, e)}
+                                                        className="w-5 h-5 rounded-full bg-teal-500 text-white flex items-center justify-center hover:bg-teal-600 shadow-sm"
+                                                        title="复制配置"
+                                                    >
+                                                        <Copy className="w-3 h-3" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => handleDeleteModel(model.id, e)}
+                                                        className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 shadow-sm"
+                                                        title="删除配置"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="text-xs text-gray-400 truncate">
-                                                {model.model}
-                                            </div>
-                                            <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={(e) => handleDuplicateModel(model, e)}
-                                                    className="w-5 h-5 rounded-full bg-teal-500 text-white flex items-center justify-center hover:bg-teal-600 shadow-sm"
-                                                    title="复制配置"
-                                                >
-                                                    <Copy className="w-3 h-3" />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => handleDeleteModel(model.id, e)}
-                                                    className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 shadow-sm"
-                                                    title="删除配置"
-                                                >
-                                                    ×
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
 
-                                {/* 添加按钮 */}
-                                <button
-                                    onClick={handleAddModel}
-                                    className="w-[72px] h-[72px] border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center text-gray-400 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50/50 transition-all"
-                                >
-                                    <Plus className="w-6 h-6" />
-                                </button>
+                                    {/* 添加按钮 */}
+                                    <button
+                                        onClick={handleAddModel}
+                                        className="w-[72px] h-[72px] border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center text-gray-400 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50/50 transition-all"
+                                    >
+                                        <Plus className="w-6 h-6" />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
 
-                        {/* 模型配置区域 - 下拉选择 */}
-                        {config.models.length > 0 && (
-                            <>
-                                <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-4">
-                                    <label className="text-sm font-medium text-gray-700">面试功能模型配置</label>
+                            {/* 模型配置区域 - 下拉选择 */}
+                            {config.models.length > 0 && (
+                                <>
+                                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-4">
+                                        <label className="text-sm font-medium text-gray-700">面试功能模型配置</label>
 
-                                    {/* Smart 通道选择 */}
-                                    <div className="space-y-2">
-                                        <label className="flex items-center gap-2 text-sm text-gray-600">
-                                            <Brain className="w-4 h-4 text-purple-500" />
-                                            Smart
-                                            <span className="text-xs text-gray-400">（复杂任务：规划、总结，推荐qwen3max）</span>
-                                        </label>
-                                        <div className="relative">
-                                            <select
-                                                value={config.smartModelId}
-                                                onChange={(e) => onSetSmartModel(e.target.value)}
-                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
-                                            >
-                                                <option value="">选择模型</option>
-                                                {config.models.map((model) => (
-                                                    <option key={model.id} value={model.id}>
-                                                        {model.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                        </div>
-                                    </div>
-
-                                    {/* Fast 通道选择 */}
-                                    <div className="space-y-2">
-                                        <label className="flex items-center gap-2 text-sm text-gray-600">
-                                            <Zap className="w-4 h-4 text-amber-500" />
-                                            Fast
-                                            <span className="text-xs text-gray-400">（快速响应：问答、点评，任意都可）</span>
-                                        </label>
-                                        <div className="relative">
-                                            <select
-                                                value={config.fastModelId}
-                                                onChange={(e) => onSetFastModel(e.target.value)}
-                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
-                                            >
-                                                <option value="">选择模型</option>
-                                                {config.models.map((model) => (
-                                                    <option key={model.id} value={model.id}>
-                                                        {model.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 简历工具专家模型配置 */}
-                                <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-4">
-                                    <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                        <FileText className="w-4 h-4 text-teal-600" />
-                                        简历工具模型配置
-                                    </label>
-
-                                    <div className="flex items-start gap-2 p-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg">
-                                        <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                                        <p>注意：由于免费模型存在并发限制，匹配分析师、内容优化师、HR审核官只允许一个配置免费模型。deepseekv3.2与deepseekchat是同一模型</p>
-                                    </div>
-
-                                    {/* 通用任务（简历分析 + 主持人） */}
-                                    <div className="space-y-2">
-                                        <label className="flex items-center gap-2 text-sm text-gray-600">
-                                            <Brain className="w-4 h-4 text-indigo-500" />
-                                            通用任务
-                                            <span className="text-xs text-gray-400">（简历分析、主持人，推荐qwen3max）</span>
-                                        </label>
-                                        <div className="relative">
-                                            <select
-                                                value={config.generalModelId || ''}
-                                                onChange={(e) => onSetGeneralModel(e.target.value)}
-                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
-                                            >
-                                                <option value="">选择模型</option>
-                                                {config.models.map((model) => (
-                                                    <option key={model.id} value={model.id}>
-                                                        {model.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                        </div>
-                                    </div>
-
-                                    {/* 匹配分析师 */}
-                                    <div className="space-y-2">
-                                        <label className="flex items-center gap-2 text-sm text-gray-600">
-                                            <Users className="w-4 h-4 text-blue-500" />
-                                            匹配分析师
-                                            <span className="text-xs text-gray-400">（JD关键词匹配，推荐deepseekv3.2）</span>
-                                        </label>
-                                        <div className="relative">
-                                            <select
-                                                value={config.matchAnalystModelId || ''}
-                                                onChange={(e) => onSetMatchAnalystModel(e.target.value)}
-                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
-                                            >
-                                                <option value="">选择模型</option>
-                                                {config.models.map((model) => (
-                                                    <option key={model.id} value={model.id}>
-                                                        {model.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                        </div>
-                                    </div>
-
-                                    {/* 内容优化师 */}
-                                    <div className="space-y-2">
-                                        <label className="flex items-center gap-2 text-sm text-gray-600">
-                                            <PenTool className="w-4 h-4 text-green-500" />
-                                            内容优化师
-                                            <span className="text-xs text-gray-400">（内容重写建议，推荐deepseekv3.2/kimi-k2）</span>
-                                        </label>
-                                        <div className="relative">
-                                            <select
-                                                value={config.contentWriterModelId || ''}
-                                                onChange={(e) => onSetContentWriterModel(e.target.value)}
-                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
-                                            >
-                                                <option value="">选择模型</option>
-                                                {config.models.map((model) => (
-                                                    <option key={model.id} value={model.id}>
-                                                        {model.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                        </div>
-                                    </div>
-
-                                    {/* HR审核官 */}
-                                    <div className="space-y-2">
-                                        <label className="flex items-center gap-2 text-sm text-gray-600">
-                                            <UserCheck className="w-4 h-4 text-orange-500" />
-                                            HR审核官
-                                            <span className="text-xs text-gray-400">（模拟HR筛选，推荐deepseekv3.2/minimax）</span>
-                                        </label>
-                                        <div className="relative">
-                                            <select
-                                                value={config.hrReviewerModelId || ''}
-                                                onChange={(e) => onSetHrReviewerModel(e.target.value)}
-                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
-                                            >
-                                                <option value="">选择模型</option>
-                                                {config.models.map((model) => (
-                                                    <option key={model.id} value={model.id}>
-                                                        {model.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                        </div>
-                                    </div>
-
-                                    {/* 质量审核 */}
-                                    <div className="space-y-2">
-                                        <label className="flex items-center gap-2 text-sm text-gray-600">
-                                            <CheckCircle className="w-4 h-4 text-purple-500" />
-                                            质量审核
-                                            <span className="text-xs text-gray-400">（最终检查，推荐qwen3max）</span>
-                                        </label>
-                                        <div className="relative">
-                                            <select
-                                                value={config.reflectorModelId || ''}
-                                                onChange={(e) => onSetReflectorModel(e.target.value)}
-                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
-                                            >
-                                                <option value="">选择模型</option>
-                                                {config.models.map((model) => (
-                                                    <option key={model.id} value={model.id}>
-                                                        {model.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 语音面试 */}
-                                <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
-                                    <h4 className="text-sm font-medium text-purple-800 mb-2">🎤 语音面试</h4>
-                                    <div className="space-y-2">
-                                        <label className="text-xs text-gray-600">语音模型 (必须选择 Qwen3-Omni)</label>
-                                        <div className="relative">
-                                            <select
-                                                value={config.voiceModelId || ''}
-                                                onChange={(e) => onSetVoiceModel(e.target.value)}
-                                                className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
-                                            >
-                                                <option value="">选择模型</option>
-                                                {config.models
-                                                    .filter(m => m.model === 'qwen3-omni-flash-2025-12-01')
-                                                    .map((model) => (
+                                        {/* Smart 通道选择 */}
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 text-sm text-gray-600">
+                                                <Brain className="w-4 h-4 text-purple-500" />
+                                                Smart
+                                                <span className="text-xs text-gray-400">（复杂任务：规划、总结，推荐 Qwen3-Max ）</span>
+                                            </label>
+                                            <div className="relative">
+                                                <select
+                                                    value={config.smartModelId}
+                                                    onChange={(e) => onSetSmartModel(e.target.value)}
+                                                    className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                                >
+                                                    <option value="">选择模型</option>
+                                                    {config.models.map((model) => (
                                                         <option key={model.id} value={model.id}>
                                                             {model.name}
                                                         </option>
                                                     ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                            </div>
                                         </div>
-                                        <p className="text-xs text-purple-600 font-medium mt-1.5 flex items-center gap-1.5">
-                                            <AlertCircle className="w-3 h-3" />
-                                            语音功能仅支持：qwen3-omni-flash-2025-12-01
-                                        </p>
-                                    </div>
-                                </div>
-                            </>
-                        )}
 
-                        {/* 空状态提示 */}
-                        {config.models.length === 0 && (
-                            <div className="text-center py-6 text-gray-400 text-sm">
-                                点击上方 + 按钮添加模型配置
-                            </div>
-                        )}
+                                        {/* Fast 通道选择 */}
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 text-sm text-gray-600">
+                                                <Zap className="w-4 h-4 text-amber-500" />
+                                                Fast
+                                                <span className="text-xs text-gray-400">（快速响应：问答、点评，推荐 MiMo-V2-Flash/ DeepSeek-V3.2）</span>
+                                            </label>
+                                            <div className="relative">
+                                                <select
+                                                    value={config.fastModelId}
+                                                    onChange={(e) => onSetFastModel(e.target.value)}
+                                                    className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                                >
+                                                    <option value="">选择模型</option>
+                                                    {config.models.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 简历工具专家模型配置 */}
+                                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-4">
+                                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                            <FileText className="w-4 h-4 text-teal-600" />
+                                            简历工具模型配置
+                                        </label>
+
+                                        <div className="flex items-start gap-2 p-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg">
+                                            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                            <p>注意：心流、魔搭免费模型存在并发限制，匹配分析师、内容优化师、HR审核官只允许一个配置免费模型。deepseekv3.2与deepseekchat是同一模型</p>
+                                        </div>
+
+                                        {/* 通用任务（简历分析 + 主持人） */}
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 text-sm text-gray-600">
+                                                <Brain className="w-4 h-4 text-indigo-500" />
+                                                通用任务
+                                                <span className="text-xs text-gray-400">（简历分析、主持人，推荐Qwen3-Max）</span>
+                                            </label>
+                                            <div className="relative">
+                                                <select
+                                                    value={config.generalModelId || ''}
+                                                    onChange={(e) => onSetGeneralModel(e.target.value)}
+                                                    className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                                >
+                                                    <option value="">选择模型</option>
+                                                    {config.models.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                            </div>
+                                        </div>
+
+                                        {/* 匹配分析师 */}
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 text-sm text-gray-600">
+                                                <Users className="w-4 h-4 text-blue-500" />
+                                                匹配分析师
+                                                <span className="text-xs text-gray-400">（JD关键词匹配，推荐Qwen3-Max/DeepSeek-V3.2）</span>
+                                            </label>
+                                            <div className="relative">
+                                                <select
+                                                    value={config.matchAnalystModelId || ''}
+                                                    onChange={(e) => onSetMatchAnalystModel(e.target.value)}
+                                                    className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                                >
+                                                    <option value="">选择模型</option>
+                                                    {config.models.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                            </div>
+                                        </div>
+
+                                        {/* 内容优化师 */}
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 text-sm text-gray-600">
+                                                <PenTool className="w-4 h-4 text-green-500" />
+                                                内容优化师
+                                                <span className="text-xs text-gray-400">（内容重写建议，推荐 DeepSeek-V3.2 / GLM-4.7）</span>
+                                            </label>
+                                            <div className="relative">
+                                                <select
+                                                    value={config.contentWriterModelId || ''}
+                                                    onChange={(e) => onSetContentWriterModel(e.target.value)}
+                                                    className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                                >
+                                                    <option value="">选择模型</option>
+                                                    {config.models.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                            </div>
+                                        </div>
+
+                                        {/* HR审核官 */}
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 text-sm text-gray-600">
+                                                <UserCheck className="w-4 h-4 text-orange-500" />
+                                                HR审核官
+                                                <span className="text-xs text-gray-400">（模拟HR筛选，推荐 GLM-4.7 / DeepSeek-V3.2）</span>
+                                            </label>
+                                            <div className="relative">
+                                                <select
+                                                    value={config.hrReviewerModelId || ''}
+                                                    onChange={(e) => onSetHrReviewerModel(e.target.value)}
+                                                    className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                                >
+                                                    <option value="">选择模型</option>
+                                                    {config.models.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                            </div>
+                                        </div>
+
+                                        {/* 质量审核 */}
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 text-sm text-gray-600">
+                                                <CheckCircle className="w-4 h-4 text-purple-500" />
+                                                质量审核
+                                                <span className="text-xs text-gray-400">（质量检查，推荐kimi-k2/MiMo-V2-Flash）</span>
+                                            </label>
+                                            <div className="relative">
+                                                <select
+                                                    value={config.reflectorModelId || ''}
+                                                    onChange={(e) => onSetReflectorModel(e.target.value)}
+                                                    className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                                >
+                                                    <option value="">选择模型</option>
+                                                    {config.models.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 语音面试 */}
+                                    <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                                        <h4 className="text-sm font-medium text-purple-800 mb-2">🎤 语音面试</h4>
+                                        <div className="space-y-2">
+                                            <label className="text-xs text-gray-600">语音模型 (必须选择 Qwen3-Omni)</label>
+                                            <div className="relative">
+                                                <select
+                                                    value={config.voiceModelId || ''}
+                                                    onChange={(e) => onSetVoiceModel(e.target.value)}
+                                                    className="w-full appearance-none rounded-lg border border-gray-200 px-4 py-2.5 pr-10 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-50 focus:outline-none bg-white"
+                                                >
+                                                    <option value="">选择模型</option>
+                                                    {config.models
+                                                        .filter(m => m.model === 'qwen3-omni-flash-2025-12-01')
+                                                        .map((model) => (
+                                                            <option key={model.id} value={model.id}>
+                                                                {model.name}
+                                                            </option>
+                                                        ))}
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                            </div>
+                                            <p className="text-xs text-purple-600 font-medium mt-1.5 flex items-center gap-1.5">
+                                                <AlertCircle className="w-3 h-3" />
+                                                语音功能仅支持：qwen3-omni-flash-2025-12-01
+                                            </p>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* 空状态提示 */}
+                            {config.models.length === 0 && (
+                                <div className="text-center py-6 text-gray-400 text-sm">
+                                    点击上方 + 按钮添加模型配置
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    <DialogFooter>
+                    <DialogFooter className="p-6 pt-4 border-t bg-gray-50/50">
                         <Button onClick={() => onOpenChange(false)} className="bg-teal-600 hover:bg-teal-700">
                             完成
                         </Button>

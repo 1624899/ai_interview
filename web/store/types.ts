@@ -112,7 +112,7 @@ export const API_PROVIDERS = [
     { id: 'iflow', name: '心流开放平台（免费，含资源限制）', baseUrl: 'https://apis.iflow.cn/v1', apiKeyUrl: 'https://platform.iflow.cn/profile?tab=apiKey', models: ['qwen3-max', 'qwen3-coder-plus', 'glm-4.6', 'kimi-k2', 'qwen3-235b-a22b-instruct', 'deepseek-v3.2'] },
     { id: 'modelscope', name: '魔搭社区（免费，含资源限制，且需关联阿里云百炼）', baseUrl: 'https://api-inference.modelscope.cn/v1', apiKeyUrl: 'https://www.modelscope.cn/my/myaccesstoken', models: ['deepseek-ai/DeepSeek-V3.2', 'XiaomiMiMo/MiMo-V2-Flash', 'Qwen/Qwen3-Coder-480B-A35B-Instruct', 'Qwen/Qwen3-235B-A22B-Instruct-2507'] },
     { id: 'minimax', name: 'Minimax', baseUrl: 'https://api.minimaxi.com/v1', apiKeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key', models: ['MiniMax-M2.1'] },
-    { id: 'aiping', name: 'AI Ping（含限时免费模型） ', baseUrl: 'https://aiping.cn/api/v1', apiKeyUrl: 'https://www.aiping.cn/user/apikey', models: ['GLM-4.7', 'MiniMax-M2.1', 'DeepSeek-V3.2', 'Qwen3-235B-A22B', 'Doubao-Seedream-4.5', 'MiMo-V2-Flash'] },
+    { id: 'aiping', name: 'AI Ping（含限时免费模型） ', baseUrl: 'https://aiping.cn/api/v1', apiKeyUrl: 'https://www.aiping.cn/user/apikey', models: ['GLM-4.7', 'MiniMax-M2.1', 'DeepSeek-V3.2', 'Qwen3-235B-A22B', 'MiMo-V2-Flash'] },
     { id: 'custom', name: '自定义', baseUrl: '', apiKeyUrl: '', models: [] },
 ];
 

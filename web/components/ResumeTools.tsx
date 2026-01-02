@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useInterviewStore } from "@/store/useInterviewStore";
 import { ResumeGenerationDialog } from "./ResumeGenerationDialog";
 import { ResumePreviewDialog } from "./ResumePreviewDialog";
+import { ResumeProcessingView } from "./ResumeProcessingView";
 
 import {
     analyzeResume,
@@ -774,7 +775,9 @@ export function ResumeTools({ apiConfig, resumeContent, onResumeChange }: Resume
 
                         {/* 右侧结果区 */}
                         <div className="lg:col-span-7 h-full overflow-hidden flex flex-col min-h-0">
-                            {analyzeResult ? (
+                            {isAnalyzing ? (
+                                <ResumeProcessingView type="analyze" />
+                            ) : analyzeResult ? (
                                 <ScrollArea className="h-full pr-4">
                                     <div className="pb-4">
                                         {renderAnalyzeResult()}
@@ -890,7 +893,9 @@ export function ResumeTools({ apiConfig, resumeContent, onResumeChange }: Resume
 
                         {/* 右侧结果区 */}
                         <div className="lg:col-span-7 h-full overflow-hidden flex flex-col min-h-0">
-                            {optimizeResult ? (
+                            {isOptimizing ? (
+                                <ResumeProcessingView type="optimize" message={optimizeProgress} />
+                            ) : optimizeResult ? (
                                 <ScrollArea className="h-full pr-4">
                                     <div className="pb-4">
                                         {renderOptimizeResult()}

@@ -19,6 +19,7 @@ import {
     useInterviewStore
 } from '@/store/useInterviewStore';
 import { getUserId } from '@/hooks/useUserIdentity';
+import { toast } from "sonner";
 
 interface SettingsDialogProps {
     open: boolean;
@@ -82,6 +83,11 @@ function ModelFormDialog({ open, onClose, onSave, editingModel, initialValues }:
         }
     }, [open, editingModel, initialValues]);
 
+    // 监听输入变化，重置测试状态
+    useEffect(() => {
+        if (testResult) setTestResult(null);
+    }, [apiKey, baseUrl, model, provider]);
+
     // 选择提供商
     const handleProviderChange = (providerId: string) => {
         setProvider(providerId);
@@ -94,7 +100,6 @@ function ModelFormDialog({ open, onClose, onSave, editingModel, initialValues }:
                 setModel('');
             }
         }
-        setTestResult(null);
     };
 
     // 测试连接
@@ -123,14 +128,29 @@ function ModelFormDialog({ open, onClose, onSave, editingModel, initialValues }:
             });
 
             const data = await response.json();
-            setTestResult({
+            const result = {
                 success: data.success,
                 message: data.message || (data.success ? '连接成功！' : '连接失败')
-            });
+            };
+            setTestResult(result);
+
+            if (data.success) {
+                toast.success('连接成功！', {
+                    description: '您的 API 配置已验证通过'
+                });
+            } else {
+                toast.error('连接失败', {
+                    description: result.message
+                });
+            }
         } catch (error) {
+            const message = '无法连接到服务器，请检查网络';
             setTestResult({
                 success: false,
-                message: '无法连接到服务器，请检查网络'
+                message
+            });
+            toast.error('连接错误', {
+                description: message
             });
         } finally {
             setIsTesting(false);
@@ -314,19 +334,12 @@ function ModelFormDialog({ open, onClose, onSave, editingModel, initialValues }:
                             />
                         </div>
 
-                        {/* 测试连接结果 */}
-                        {testResult && (
+                        {/* 测试连接结果 - 只在失败时显示 Banner，成功则直接体现在按钮上 */}
+                        {testResult && !testResult.success && (
                             <div className={cn(
-                                "flex items-center gap-2 p-3 rounded-lg text-sm",
-                                testResult.success
-                                    ? "bg-green-50 text-green-700 border border-green-200"
-                                    : "bg-red-50 text-red-700 border border-red-200"
+                                "flex items-center gap-2 p-3 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200 animate-in fade-in slide-in-from-top-1"
                             )}>
-                                {testResult.success ? (
-                                    <Check className="w-4 h-4 flex-shrink-0" />
-                                ) : (
-                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                )}
+                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
                                 {testResult.message}
                             </div>
                         )}
@@ -347,12 +360,22 @@ function ModelFormDialog({ open, onClose, onSave, editingModel, initialValues }:
                         variant="outline"
                         onClick={handleTestConnection}
                         disabled={isTesting || !canSave}
-                        className="flex-1 sm:flex-none border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 hover:text-orange-800 hover:border-orange-300 transition-colors"
+                        className={cn(
+                            "flex-1 sm:flex-none transition-all duration-300",
+                            testResult?.success
+                                ? "border-green-200 text-green-700 bg-green-50 hover:bg-green-100 hover:text-green-800 hover:border-green-300"
+                                : "border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 hover:text-orange-800 hover:border-orange-300"
+                        )}
                     >
                         {isTesting ? (
                             <>
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                 测试中...
+                            </>
+                        ) : testResult?.success ? (
+                            <>
+                                <Check className="w-4 h-4 mr-2" />
+                                连接成功
                             </>
                         ) : (
                             '测试连接'

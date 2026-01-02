@@ -13,7 +13,7 @@ import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { getUserId } from "@/hooks/useUserIdentity";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { ResumeTools } from "@/components/ResumeTools";
 import { LandingPage } from "@/components/LandingPage";
 import { InterviewSetup } from "@/components/interview/InterviewSetup";
@@ -871,7 +871,6 @@ export default function InterviewPage() {
           onOpenChange={setShowSessionProfileDialog}
           sessionId={currentSession?.session_id || ""}
         />
-        <Toaster />
       </main>
     </div>
   );
